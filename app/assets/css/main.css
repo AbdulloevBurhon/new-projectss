@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "../../../shared/ui/css/layout.css";
+@import "../../../shared/ui/css/controls.css";
+@import "../../../shared/ui/css/tables.css";
+@import "../../../shared/ui/css/narrow.css";
+@import "../../features/tsekh/assets/css/pagination.css";
+@import "../../features/tsekh/warehouse/assets/tabs.css";
+@import "../../features/tsekh/warehouse/assets/techcards.css";
+@import "../../features/tsekh/accounts/assets/accounts.css";
+@import "../../features/tsekh/sales/assets/sales.css";
+@import "../../features/tsekh/summary/assets/summary.css";
+@import "../../features/tsekh/workers/assets/workers.css";
+@import "../../features/tsekh/workers/assets/work-entry.css";

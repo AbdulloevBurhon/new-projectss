@@ -1,0 +1,31 @@
+.inventory-tab-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 18px;
+}
+.inventory-tab-toolbar .inventory-tabs { margin-bottom: 0; }
+.inventory-tab-action { margin-inline-start: auto; }
+.inventory-tab-action:empty { display: none; }
+
+.inventory-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  width: fit-content;
+  margin-bottom: 18px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.inventory-tabs a {
+  padding: 8px 14px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+.inventory-tabs a:hover { background: #eef2f7; color: var(--ink); }
+.inventory-tabs a.is-current { background: var(--ink); color: #fff; }

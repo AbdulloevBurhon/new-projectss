@@ -1,0 +1,47 @@
+.workers-toolbar-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 8px; margin-inline-start: auto; }
+.worker-name { text-align: left; }
+.worker-name:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.workers-table .table-actions { width: 150px; }
+
+.worker-summary, .worker-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.worker-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #eaf5db;
+  color: #365a20;
+  font-weight: 800;
+}
+
+.worker-totals { display: flex; flex: 1; flex-wrap: wrap; gap: 10px; }
+.worker-totals div {
+  min-width: 125px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+}
+.worker-totals dt { color: var(--muted); font-size: 12px; }
+.worker-totals dd { font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.worker-period { align-items: end; }
+.worker-records { min-width: 0; border: 1px solid var(--line); border-radius: 9px; }
+.worker-records th { border-top: 0; }
+.worker-records .table-actions { width: 96px; }
+.worker-records td, .worker-records th { padding-inline: 12px; }
+.worker-records tbody tr:last-child td { border-bottom: 0; }
+.worker-date { white-space: nowrap; }
+.workers-link { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 600px) {
+  .workers-table td, .workers-table th { padding-inline: 10px; }
+  .workers-table .inventory-actions { gap: 1px; }
+}

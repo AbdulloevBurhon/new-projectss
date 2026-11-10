@@ -1,0 +1,12 @@
+.clients-add { margin-inline-start: auto; }
+.client-name { text-align: left; }
+.client-name:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.inventory-table td.client-debt { color: #a42635; font-weight: 650; }
+.inventory-dialog.client-details { width: 900px; }
+.client-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 8px; }
+.client-summary div { padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+.client-summary dt { color: var(--muted); font-size: 12px; }
+.client-summary dd { font-weight: 750; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.client-purchases { overflow: hidden; border: 1px solid var(--line); border-radius: 9px; }
+.client-purchases th { border-top: 0; }
+.client-purchases .table-actions { width: 90px; }

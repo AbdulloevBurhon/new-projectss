@@ -1,0 +1,87 @@
+.inventory-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+.inventory-metric {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 96px;
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 3px #14263a06;
+}
+a.inventory-metric:hover { border-color: #b1c795; background: #fefff9; }
+.metric-icon, .table-icon { display: grid; flex: none; place-items: center; }
+.metric-icon { width: 43px; height: 43px; border-radius: 10px; }
+.metric-icon[data-color="warehouses"] { background: #eaf5db; color: #436b26; }
+.metric-icon[data-color="products"] { background: #eaf1ff; color: #305e9b; }
+.metric-icon[data-color="receipts"] { background: #f0ebfc; color: #654693; }
+.inventory-metric small { display: block; color: var(--muted); font-weight: 600; }
+.inventory-metric strong { display: block; font-size: 24px; line-height: 1.3; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.metric-arrow { width: 13px; height: 13px; margin-left: auto; color: #728197; }
+
+.inventory-panel { border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 3px 6px #14263a06; }
+.panel-heading, .panel-filters { display: flex; align-items: center; gap: 14px; padding: 18px 21px; }
+.panel-heading { justify-content: space-between; }
+.panel-heading h2, .dialog-heading h2 { margin: 0; font-size: 18px; font-weight: 750; letter-spacing: -.025em; }
+.panel-heading p { margin-top: 3px; font-size: 13px; }
+.panel-filters { align-items: end; }
+.panel-heading + .panel-filters { padding-top: 0; }
+.inventory-field { display: grid; gap: 6px; color: #3e4f64; font-size: 12px; font-weight: 650; }
+.inventory-field select { min-width: 180px; }
+.inventory-field input, .inventory-field select, .inventory-search, .number-field {
+  min-height: 39px;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.inventory-field input, .inventory-field select { padding: 7px 10px; }
+.inventory-search { display: flex; align-items: center; gap: 8px; width: 251px; padding: 0 10px; }
+.inventory-search > .inventory-icon { width: 16px; height: 16px; color: #617289; }
+.inventory-search input { width: 100%; min-height: 36px; border: 0; padding: 0; outline: none; background: transparent; }
+.inventory-search:focus-within, .number-field:focus-within { outline: 2px solid #568a23; outline-offset: 2px; }
+.inventory-search input::placeholder, .inventory-field input::placeholder, .number-field input::placeholder { color: #66768a; opacity: 1; }
+.inventory-table { width: 100%; border-collapse: collapse; table-layout: auto; text-align: left; }
+.inventory-table th {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 11px 21px;
+  background: var(--soft);
+  color: #465972;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .025em;
+}
+.inventory-table td { padding: 11px 21px; border-bottom: 1px solid #edf0f4; color: #3b4e65; }
+.inventory-table td strong { color: var(--ink); font-weight: 650; }
+.inventory-table tbody tr:hover { background: #fbfcfd; }
+.inventory-table .table-empty { height: 96px; text-align: center; color: var(--muted); }
+.table-item { display: inline-flex; align-items: center; gap: 10px; overflow-wrap: anywhere; }
+.table-icon { width: 33px; height: 33px; border-radius: 8px; background: #eef2f7; color: #4e6581; }
+.table-icon .inventory-icon { width: 17px; height: 17px; }
+.inventory-actions { display: flex; justify-content: end; gap: 5px; }
+.table-actions, .numeric-cell { text-align: right; white-space: nowrap; }
+.table-actions { width: 142px; }
+.numeric-cell { font-variant-numeric: tabular-nums; }
+.table-secondary { display: block; margin-top: 2px; color: var(--muted); white-space: nowrap; }
+.inventory-tag { display: inline-block; padding: 3px 9px; border-radius: 99px; background: #edf1f6; color: #344c69; font-size: 12px; font-weight: 650; }
+.inventory-tag.positive { background: #eaf5e4; color: #305b2c; }
+.panel-note { padding: 13px 21px; color: var(--muted); font-size: 12px; }
+
+.number-field { display: flex; align-items: center; gap: 4px; width: 116px; padding: 0 7px; }
+.number-field input { width: 100%; min-width: 0; min-height: 36px; outline: none; }
+.number-field span { color: var(--muted); font-size: 11px; }
+.receipt-filters, .receipt-payment-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.receipt-account-balance { padding: 3px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); }
+.receipt-account-balance span, .receipt-account-balance strong { display: block; font-variant-numeric: tabular-nums; }
+.receipt-account-balance span { color: var(--muted); font-size: 11px; }
+.icon-button.receipt-reset { border-radius: 50%; }
+.receipt-insufficient { color: #a42635; }
+.inventory-message { display: flex; align-items: center; gap: 8px; padding: 10px 13px; margin: 0 0 16px; border: 1px solid; border-radius: 8px; font-size: 13px; }
+.inventory-message.success { background: #edf8e7; border-color: #cbe3c0; color: #285128; }
+.inventory-message.error { background: #fff1f2; border-color: #f5cbd0; color: #9e2532; }
+.inventory-message a, .inventory-panel a { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.receipt-error { margin-inline: 21px; }
