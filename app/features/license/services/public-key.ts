@@ -1,1 +1,0 @@
-export const licensePublicKeyPem = "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEjTL6OpdRSMyHFTvlgBg59jEzu3Y3\nAY8PJFltX0oDGKFEo3PE51I1AMns2KxV603hPzm4GtQWt3+XoZPPoYPs3g==\n-----END PUBLIC KEY-----\n"
