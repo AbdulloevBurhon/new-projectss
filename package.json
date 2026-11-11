@@ -1,0 +1,18 @@
+{
+  "name": "obshaya-programma",
+  "private": true,
+  "workspaces": [
+    "admin",
+    "tsekh",
+    "shawarma",
+    "cloudflare/worker",
+    "shared/ui",
+    "shared/contracts"
+  ],
+  "scripts": {
+    "dev:admin": "npm run dev --workspace @obshaya/admin",
+    "dev:tsekh": "npm run dev --workspace @obshaya/tsekh",
+    "dev:shawarma": "npm run dev --workspace @obshaya/shawarma",
+    "dev:worker": "npm run dev --workspace @obshaya/worker"
+  }
+}
