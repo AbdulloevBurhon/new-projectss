@@ -82,6 +82,23 @@
 .workspace-avatar { width: 35px; height: 35px; background: #293851; color: #e0ebff; font-size: 12px; font-weight: 750; }
 .sidebar-footer strong, .sidebar-footer small { display: block; }
 .sidebar-footer small { color: #a9b8ce; font-size: 11px; }
+.sidebar-logout {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  margin-left: auto;
+  border: 1px solid #40506a;
+  border-radius: 9px;
+  color: #d2deef;
+  background: transparent;
+  cursor: pointer;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.sidebar-logout:hover { color: #fff; border-color: #597092; background: #263850; }
+.sidebar-logout svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.logout-dialog-body p { margin: 0; color: #526279; line-height: 1.5; }
 
 .is-sidebar-collapsed .inventory-sidebar { padding-inline: 12px; }
 .is-sidebar-collapsed .inventory-brand { justify-content: center; padding: 0; }

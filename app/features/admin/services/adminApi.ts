@@ -44,6 +44,7 @@ export function useAdminApi() {
     setExpiry: (id: string, expiresAt: number) => request(`/licenses/${encodeURIComponent(id)}/term`, { method: 'PATCH', body: JSON.stringify({ expiresAt }) }),
     resetPin: (id: string) => request<{ temporaryPin: string; expiresAt: number }>(`/licenses/${encodeURIComponent(id)}/reset-pin`, { method: 'POST', body: '{}' }),
     setLicenseStatus: (id: string, active: boolean) => request(`/licenses/${encodeURIComponent(id)}/${active ? 'activate' : 'revoke'}`, { method: 'POST', body: '{}' }),
+    deleteLicense: (id: string) => request(`/licenses/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     publishRelease: (form: FormData) => request('/releases', { method: 'POST', body: form }),
     toggleRelease: (productId: ProductId, version: string) => request(`/releases/${encodeURIComponent(productId)}/${encodeURIComponent(version)}/toggle`, { method: 'POST', body: '{}' }),
   }

@@ -1,8 +1,8 @@
 @import "tailwindcss";
-@import "../../../shared/ui/css/layout.css";
-@import "../../../shared/ui/css/controls.css";
-@import "../../../shared/ui/css/tables.css";
-@import "../../../shared/ui/css/narrow.css";
+@import "./base/layout.css";
+@import "./base/controls.css";
+@import "./base/tables.css";
+@import "./base/narrow.css";
 @import "../../features/tsekh/assets/css/pagination.css";
 @import "../../features/tsekh/warehouse/assets/tabs.css";
 @import "../../features/tsekh/warehouse/assets/techcards.css";

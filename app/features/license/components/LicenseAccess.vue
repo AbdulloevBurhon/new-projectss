@@ -75,7 +75,8 @@ async function sendRequest() {
   state.value = 'sending'
   error.value = ''
   try {
-    const result = await createActivationRequest(productId.value)
+    productId.value = 'tsekh'
+    const result = await createActivationRequest('tsekh')
     requestId.value = result.requestId
     state.value = result.status === 'pending' ? 'pending' : 'idle'
     beginPolling()
@@ -98,6 +99,7 @@ async function refreshLicense() {
     } else {
       active.value = false
       state.value = 'revoked'
+      await navigateTo('/activation')
     }
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : ''
@@ -105,6 +107,7 @@ async function refreshLicense() {
       active.value = false
       error.value = ''
       state.value = 'revoked'
+      await navigateTo('/activation')
     }
   }
 }
@@ -124,6 +127,9 @@ function retryOnline() {
   } else if (state.value === 'offline') {
     void sendRequest()
   }
+}
+function refreshWhenVisible() {
+  if (document.visibilityState === 'visible' && navigator.onLine) void refreshLicense()
 }
 function finishActivation() {
   active.value = true
@@ -154,7 +160,11 @@ onMounted(async () => {
       if (useRoute().path === '/activation') void navigateTo(productId.value === 'tsekh' ? '/tsekh' : '/shawarma')
     } else {
       requestId.value = readActivationRequest()
-      if (saved) { productId.value = saved.payload.productId || 'tsekh'; state.value = 'revoked' }
+      if (saved) {
+        productId.value = saved.payload.productId || 'tsekh'
+        state.value = 'revoked'
+        if (useRoute().path !== '/activation') void navigateTo('/activation')
+      }
       if (requestId.value && navigator.onLine) {
         state.value = 'pending'
         beginPolling()
@@ -167,10 +177,13 @@ onMounted(async () => {
         active.value = false
         error.value = ''
         state.value = 'revoked'
+        void navigateTo('/activation')
       }
     }, 30_000)
-    syncTimer = window.setInterval(() => void refreshLicense(), 30_000)
+    syncTimer = window.setInterval(() => void refreshLicense(), 10_000)
     window.addEventListener('online', retryOnline)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'Не удалось проверить лицензию.'
     state.value = 'error'
@@ -183,6 +196,8 @@ onBeforeUnmount(() => {
   if (licenseTimer) clearInterval(licenseTimer)
   if (syncTimer) clearInterval(syncTimer)
   window.removeEventListener('online', retryOnline)
+  document.removeEventListener('visibilitychange', refreshWhenVisible)
+  window.removeEventListener('focus', refreshWhenVisible)
 })
 </script>
 
@@ -199,13 +214,6 @@ onBeforeUnmount(() => {
       <div v-if="issuedPin" class="license-pin">{{ showPin ? issuedPin : '••••' }}
         <button type="button" aria-label="Показать PIN" @click="showPin = !showPin">{{ showPin ? 'Скрыть' : 'Показать' }}</button>
       </div>
-      <label v-if="!issuedPin && (state === 'idle' || state === 'offline' || state === 'rejected' || state === 'revoked' || state === 'error')" class="license-product">
-        Направление программы
-        <select v-model="productId" aria-label="Направление программы">
-          <option value="tsekh">Цех</option>
-          <option value="shawarma">Шаурма</option>
-        </select>
-      </label>
       <button v-if="issuedPin" class="license-button primary" type="button" @click="finishActivation">Я записал PIN — продолжить</button>
       <button v-else-if="state === 'idle' || state === 'offline' || state === 'rejected' || state === 'revoked' || state === 'error'" class="license-button primary" type="button" :disabled="state === 'sending'" @click="sendRequest">
         {{ state === 'rejected' || state === 'revoked' ? 'Отправить заявку заново' : 'Отправить заявку администратору' }}

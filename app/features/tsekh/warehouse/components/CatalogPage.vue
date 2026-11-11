@@ -6,6 +6,8 @@ import WarehouseMetrics from './WarehouseMetrics.vue'
 import TechCardEditor from './techcards/TechCardEditor.vue'
 import TechCardInfo from './techcards/TechCardInfo.vue'
 import ProductFields from './ProductFields.vue'
+import Input from '~/shared/input/Input.vue'
+import ErrorMessage from '~/shared/alert/ErrorMessage.vue'
 import { useInventory } from '../stores/useInventory'
 import type { Catalog, Product, ProductDraft, TechCard, Warehouse } from '../types/inventory'
 import { matchesName } from '../utils/format'
@@ -83,10 +85,10 @@ async function submit() {
   <p v-if="notice" role="status" class="inventory-message success"><InventoryIcon name="check" /> {{ notice }}</p>
   <section class="inventory-panel">
     <div class="panel-filters">
-      <label class="inventory-search">
+      <div class="inventory-search">
         <InventoryIcon name="search" />
-        <input v-model="query" type="search" aria-label="Поиск по названию" placeholder="Поиск по названию" />
-      </label>
+        <Input v-model="query" bare type="search" aria-label="Поиск по названию" placeholder="Поиск по названию" />
+      </div>
     </div>
     <CatalogTable :catalog="catalog" :visible="visible" :reset-key="query" :empty="query.trim() ? 'Совпадений не найдено' : labels.empty" @action="open" />
   </section>
@@ -94,12 +96,12 @@ async function submit() {
   <TechCardEditor v-if="dialog === 'form' && catalog === 'techcards'" :card="selectedCard" @close="dialog = undefined" @saved="saved" />
   <InventoryDialog v-else-if="dialog === 'form'" :title="selected ? labels.edit : labels.add" :busy="busy" @close="dialog = undefined">
     <form class="dialog-content" @submit.prevent="submit">
-      <label class="inventory-field">Название<input v-model="draft.name" maxlength="100" required autofocus :placeholder="labels.placeholder" /></label>
+      <Input v-model="draft.name" label="Название" maxlength="100" required autofocus :placeholder="labels.placeholder" />
       <ProductFields v-if="catalog === 'products'" v-model="draft" :disabled="busy" />
       <label v-else class="inventory-field">Тип склада
         <select v-model="kind" :disabled="busy"><option v-for="(name, value) in warehouseKinds" :key="value" :value="value">{{ name }}</option></select>
       </label>
-      <p v-if="error" class="inventory-message error" role="alert">{{ error }}</p>
+      <ErrorMessage v-if="error">{{ error }}</ErrorMessage>
       <div class="dialog-actions">
         <button type="button" class="inventory-button secondary" :disabled="busy" @click="dialog = undefined">Отмена</button>
         <button type="submit" class="inventory-button primary" :disabled="busy">Сохранить</button>
@@ -109,7 +111,7 @@ async function submit() {
   <InventoryDialog v-else-if="dialog === 'delete'" title="Удалить запись?" :busy="busy" @close="dialog = undefined">
     <div class="dialog-content">
       <p>Удалить «{{ selected?.name }}»?</p>
-      <p v-if="error" class="inventory-message error" role="alert">{{ error }}</p>
+      <ErrorMessage v-if="error">{{ error }}</ErrorMessage>
       <div class="dialog-actions">
         <button type="button" class="inventory-button secondary" :disabled="busy" autofocus @click="dialog = undefined">Отмена</button>
         <button type="button" class="inventory-button destructive" :disabled="busy" @click="submit">Удалить</button>

@@ -136,11 +136,18 @@ onMounted(() => {
   mustChangePin.value = localStorage.getItem(resetRequiredKey) === '1'
   if (mustChangePin.value) locked.value = false
   window.addEventListener('storage', sync)
+  window.addEventListener('tsekh:lock-session', lockSession)
 })
+function lockSession() {
+  pin.value = ''
+  failure.value = ''
+  locked.value = true
+}
 onBeforeUnmount(() => {
   window.removeEventListener('storage', sync)
   window.removeEventListener('online', updateOnline)
   window.removeEventListener('offline', updateOnline)
+  window.removeEventListener('tsekh:lock-session', lockSession)
   if (feedbackTimer) window.clearInterval(feedbackTimer)
 })
 </script>

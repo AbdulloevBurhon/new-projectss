@@ -58,6 +58,16 @@ export async function adminRequest(request: Request, env: Env, path: string): Pr
   if (statusMatch && request.method === 'POST') {
     await env.DB.prepare('UPDATE product_licenses SET status = ? WHERE id = ?').bind(statusMatch[2] === 'activate' ? 'active' : 'revoked', decodeURIComponent(statusMatch[1]!)).run(); return json({ ok: true })
   }
+  const licenseDeleteMatch = path.match(/^\/api\/v1\/admin\/licenses\/([^/]+)$/)
+  if (licenseDeleteMatch && request.method === 'DELETE') {
+    const licenseId = decodeURIComponent(licenseDeleteMatch[1]!)
+    if (!await findLicenseById(env, licenseId)) return json({ error: 'Клиент не найден.' }, 404)
+    await env.DB.batch([
+      env.DB.prepare('UPDATE activation_requests SET license_id = NULL WHERE license_id = ?').bind(licenseId),
+      env.DB.prepare('DELETE FROM product_licenses WHERE id = ?').bind(licenseId),
+    ])
+    return json({ ok: true })
+  }
   const pinMatch = path.match(/^\/api\/v1\/admin\/licenses\/([^/]+)\/reset-pin$/)
   if (pinMatch && request.method === 'POST') {
     const licenseId = decodeURIComponent(pinMatch[1]!), license = await findLicenseById(env, licenseId)

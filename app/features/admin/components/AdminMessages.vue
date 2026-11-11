@@ -5,7 +5,6 @@ import { useAdminStore } from '../stores/admin.store'
 
 const store = useAdminStore()
 const api = useAdminApi()
-const route = useRoute()
 const messages = ref<AdminMessage[]>([])
 const authorized = ref(false)
 const loading = ref(false)
@@ -40,7 +39,6 @@ onMounted(() => { authorized.value = !!sessionStorage.getItem('obshaya-admin-key
       <div><p class="text-xs font-bold uppercase tracking-[0.18em] text-lime-700">Управление лицензиями</p><h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Сообщения клиентов</h1><p class="mt-1 text-sm text-slate-500">Переписка и статусы доставки ответов.</p></div>
       <div class="flex gap-2"><button class="rounded-lg border border-slate-300 bg-white px-4 py-2" :disabled="loading" @click="refresh">Обновить</button><button class="rounded-lg border border-slate-300 bg-white px-4 py-2" @click="store.logout(); navigateTo('/admin/login')">Выйти</button></div>
     </header>
-    <nav class="mb-5 flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1"><NuxtLink v-for="item in [{ id: 'requests', label: 'Заявки' }, { id: 'clients', label: 'Клиенты' }, { id: 'messages', label: 'Сообщения' }, { id: 'updates', label: 'Обновления' }]" :key="item.id" :to="`/admin/${item.id}`" class="rounded-lg px-4 py-2 text-sm font-semibold transition" :class="route.path === `/admin/${item.id}` ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'">{{ item.label }}</NuxtLink></nav>
     <p v-if="error" role="alert" class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>
     <p v-if="notice" role="status" class="mb-4 rounded-lg bg-lime-50 p-3 text-sm text-lime-800">{{ notice }}</p>
     <section class="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import WorkshopIcon from '~/features/tsekh/components/WorkshopIcon.vue'
+import Checkbox from '~/shared/checkbox/Checkbox.vue'
 
 const days = defineModel<number[]>({ required: true })
 const dropdown = useTemplateRef<HTMLDetailsElement>('dropdown')
@@ -47,9 +48,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeOutside))
       </summary>
       <fieldset class="settings-days-options">
         <legend class="sr-only">Дни резервного копирования</legend>
-        <label v-for="day in weekdays" :key="day.id" class="settings-day-option">
-          <input v-model="days" type="checkbox" :value="day.id" /><span>{{ day.name }}</span>
-        </label>
+        <Checkbox v-for="day in weekdays" :key="day.id" v-model="days" :value="day.id" class="settings-day-option">{{ day.name }}</Checkbox>
         <button type="button" class="inventory-button secondary" @click="close">Готово</button>
       </fieldset>
     </details>

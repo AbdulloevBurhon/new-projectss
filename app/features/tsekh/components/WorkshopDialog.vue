@@ -1,20 +1,18 @@
 <script setup lang="ts">
+import SharedModal from '~/shared/modal/Modal.vue'
 import InventoryIcon from './WorkshopIcon.vue'
 
-defineProps<{ title: string; busy?: boolean; wide?: boolean }>()
+defineOptions({ inheritAttrs: false })
+const props = defineProps<{ title: string; busy?: boolean; wide?: boolean }>()
 defineEmits<{ close: [] }>()
-
-const dialog = useTemplateRef<HTMLDialogElement>('dialog')
-const titleId = useId()
-onMounted(() => dialog.value?.showModal())
+const attrs = useAttrs()
+const isOpen = ref(true)
+const dialogClass = computed(() => ['inventory-dialog', props.wide && 'is-wide', attrs.class as string].filter(Boolean).join(' '))
 </script>
 
 <template>
-  <dialog ref="dialog" class="inventory-dialog" :class="{ 'is-wide': wide }" :aria-labelledby="titleId" @close="$emit('close')" @cancel="busy && $event.preventDefault()">
-    <div class="dialog-heading">
-      <h2 :id="titleId">{{ title }}</h2>
-      <button type="button" class="icon-button" aria-label="Закрыть" :disabled="busy" @click="dialog?.close()"><InventoryIcon name="close" /></button>
-    </div>
+  <SharedModal v-model="isOpen" :title="title" :busy="busy" :close-on-backdrop="false" :dialog-class="dialogClass" header-class="dialog-heading" body-class="workshop-modal-body" close-button-class="icon-button" @close="$emit('close')">
     <slot />
-  </dialog>
+    <template #close><InventoryIcon name="close" /></template>
+  </SharedModal>
 </template>

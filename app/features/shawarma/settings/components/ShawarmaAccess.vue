@@ -136,11 +136,18 @@ onMounted(() => {
   mustChangePin.value = localStorage.getItem(resetRequiredKey) === '1'
   if (mustChangePin.value) locked.value = false
   window.addEventListener('storage', sync)
+  window.addEventListener('shawarma:lock-session', lockSession)
 })
+function lockSession() {
+  pin.value = ''
+  failure.value = ''
+  locked.value = true
+}
 onBeforeUnmount(() => {
   window.removeEventListener('storage', sync)
   window.removeEventListener('online', updateOnline)
   window.removeEventListener('offline', updateOnline)
+  window.removeEventListener('shawarma:lock-session', lockSession)
   if (feedbackTimer) window.clearInterval(feedbackTimer)
 })
 </script>

@@ -1,28 +1,13 @@
 <script setup lang="ts" generic="T">
-import WorkshopPagination from './WorkshopPagination.vue'
+import SharedTable from '~/shared/table/Table.vue'
 
-const props = defineProps<{ rows: readonly T[]; resetKey?: string; tableClass?: string }>()
-defineSlots<{ default(props: { pageRows: T[] }): unknown }>()
-
-const page = ref(1)
-const pageSize = ref(5)
-const pageCount = computed(() => Math.max(1, Math.ceil(props.rows.length / pageSize.value)))
-const currentPage = computed(() => Math.min(page.value, pageCount.value))
-const start = computed(() => (currentPage.value - 1) * pageSize.value)
-const pageRows = computed(() => props.rows.slice(start.value, start.value + pageSize.value))
-
-watch([pageSize, () => props.resetKey], () => { page.value = 1 })
-watch(pageCount, count => { page.value = Math.min(page.value, count) })
+defineProps<{ rows: readonly T[]; resetKey?: string; tableClass?: string }>()
+defineSlots<{ default(props: { pageRows: T[] }): unknown; empty?(): unknown }>()
 </script>
 
 <template>
-  <div class="workshop-table">
-    <div class="workshop-table-scroll">
-      <table class="inventory-table" :class="tableClass">
-        <slot :page-rows="pageRows" />
-      </table>
-    </div>
-    <WorkshopPagination v-model:page-size="pageSize" :page="currentPage" :page-count="pageCount"
-      :start="start" :shown="pageRows.length" :total="rows.length" @update:page="page = $event" />
-  </div>
+  <SharedTable :rows="rows" :reset-key="resetKey" :table-class="`inventory-table ${tableClass || ''}`" container-class="workshop-table" scroll-class="workshop-table-scroll" :initial-page-size="5" :page-sizes="[5, 10, 50, 100]">
+    <template #default="{ pageRows }"><slot :page-rows="pageRows" /></template>
+    <template #empty><slot name="empty">Нет данных.</slot></template>
+  </SharedTable>
 </template>
