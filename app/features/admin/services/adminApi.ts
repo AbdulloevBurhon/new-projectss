@@ -33,6 +33,7 @@ export function useAdminApi() {
     login,
     overview: () => request<AdminOverview>('/overview'),
     messages: () => request<{ messages: AdminMessage[] }>('/messages'),
+    licenseMessages: (licenseId: string) => request<{ messages: AdminMessage[] }>(`/licenses/${encodeURIComponent(licenseId)}/messages`),
     replyToMessage: (id: string, message: string) => request(`/messages/${encodeURIComponent(id)}/reply`, { method: 'POST', body: JSON.stringify({ message }) }),
     deleteMessage: (id: string) => request(`/messages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     decideRequest: (id: string, approve: boolean, clientName = '', years = 5, productId: ProductId = 'tsekh') =>

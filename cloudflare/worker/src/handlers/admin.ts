@@ -72,6 +72,15 @@ export async function adminRequest(request: Request, env: Env, path: string): Pr
     const result = await env.DB.prepare('SELECT m.*, l.client_name, l.device_id, l.product_id FROM messages m JOIN product_licenses l ON l.id = m.license_id ORDER BY m.created_at DESC LIMIT 500').all()
     return json({ messages: result.results })
   }
+  const licenseMessagesMatch = path.match(/^\/api\/v1\/admin\/licenses\/([^/]+)\/messages$/)
+  if (licenseMessagesMatch && request.method === 'GET') {
+    const licenseId = decodeURIComponent(licenseMessagesMatch[1]!)
+    const license = await findLicenseById(env, licenseId)
+    if (!license) return json({ error: 'Клиент не найден.' }, 404)
+    await env.DB.prepare("UPDATE messages SET read_at = ? WHERE license_id = ? AND sender = 'client' AND read_at IS NULL").bind(now(), licenseId).run()
+    const result = await env.DB.prepare('SELECT m.*, l.client_name, l.device_id, l.product_id FROM messages m JOIN product_licenses l ON l.id = m.license_id WHERE m.license_id = ? ORDER BY m.created_at ASC LIMIT 500').bind(licenseId).all()
+    return json({ messages: result.results })
+  }
   const replyMatch = path.match(/^\/api\/v1\/admin\/messages\/([^/]+)\/reply$/)
   if (replyMatch && request.method === 'POST') {
     const parentId = decodeURIComponent(replyMatch[1]!), parent = await env.DB.prepare('SELECT license_id FROM messages WHERE id = ?').bind(parentId).first<{ license_id: string }>()
