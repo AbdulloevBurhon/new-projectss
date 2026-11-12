@@ -1,160 +1,92 @@
 <script setup lang="ts">
-import { BaseButton, BaseModal, BaseTable } from '@obshaya/ui'
+import { Download, Info, PackagePlus, Pencil, Trash2, Upload } from '@lucide/vue'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Textarea, toast } from '@obshaya/ui'
+import { computed, ref, watch } from 'vue'
+import TablePagination from '../../shared/components/TablePagination.vue'
+import { clients } from '../../admin-state'
 
-interface UpdateRow { id: string; product: string; version: string; file: string; published: string; status: string; notes: string }
+type UpdatePackage = { id: number; name: string; direction: string; version: string; fileName: string; size: number; note: string; uploadedAt: string; fileUrl?: string }
 
-const columns = [{ key: 'product', label: 'Направление' }, { key: 'version', label: 'Версия' }, { key: 'file', label: 'Файл' }, { key: 'notes', label: 'Заметка' }, { key: 'published', label: 'Опубликована' }, { key: 'status', label: 'Статус' }, { key: 'actions', label: 'Действия' }]
-const rows = ref<UpdateRow[]>([
-  { id: 'demo-tsekh', product: 'Цех', version: '1.0.1', file: 'tsekh-demo.exe', published: 'Сегодня', status: 'Демо', notes: '' },
-  { id: 'demo-shawarma', product: 'Шаурма', version: '1.0.1', file: 'shawarma-demo.exe', published: 'Сегодня', status: 'Демо', notes: '' },
+const packages = ref<UpdatePackage[]>([
+  { id: 1, name: 'Обновление Цех 0.2.0', direction: 'Цех', version: '0.2.0', fileName: 'tsekh-0.2.0.exe', size: 18.4 * 1024 * 1024, note: 'Демо-пакет обновления Цеха', uploadedAt: '12.11.2026, 09:00' },
+  { id: 2, name: 'Обновление Шаурма 0.1.0', direction: 'Шаурма', version: '0.1.0', fileName: 'shawarma-0.1.0.exe', size: 14.8 * 1024 * 1024, note: 'Демо-пакет обновления Шаурмы', uploadedAt: '11.11.2026, 16:20' },
 ])
-const modalOpen = ref(false)
-const product = ref('Цех')
-const version = ref('')
-const notes = ref('')
-const selectedFile = ref<File | null>(null)
-const error = ref('')
-const loading = ref(false)
-const selectedUpdate = ref<UpdateRow | null>(null)
-const detailsOpen = ref(false)
+const addOpen = ref(false)
+const editOpen = ref(false)
 const deleteOpen = ref(false)
+const infoOpen = ref(false)
+const direction = ref('Цех')
+const name = ref('')
+const version = ref('')
+const note = ref('')
+const file = ref<File | null>(null)
+const selectedPackage = ref<UpdatePackage | null>(null)
+const editName = ref('')
+const editVersion = ref('')
+const editNote = ref('')
+const packagePage = ref(1)
+const packagePageSize = ref(10)
+const infoPage = ref(1)
+const infoPageSize = ref(10)
+const visiblePackages = computed(() => packages.value.slice((packagePage.value - 1) * packagePageSize.value, packagePage.value * packagePageSize.value))
+const updatedClients = computed(() => clients.value.filter(client => client.direction === selectedPackage.value?.direction && client.version === selectedPackage.value?.version))
+const visibleInfoClients = computed(() => updatedClients.value.slice((infoPage.value - 1) * infoPageSize.value, infoPage.value * infoPageSize.value))
+watch(packagePageSize, () => { packagePage.value = 1 })
+watch(infoOpen, () => { infoPage.value = 1 })
 
-function showDetails(row: UpdateRow) {
-  selectedUpdate.value = row
-  detailsOpen.value = true
+function chooseFile(event: Event) {
+  file.value = (event.target as HTMLInputElement).files?.[0] ?? null
+  if (file.value && !name.value) name.value = file.value.name.replace(/\.exe$/i, '')
 }
-
-function askDelete(row: UpdateRow) {
-  selectedUpdate.value = row
-  deleteOpen.value = true
+function fileSize(bytes: number) { return `${(bytes / 1024 / 1024).toFixed(1)} МБ` }
+function openInfo(row: UpdatePackage) { selectedPackage.value = row; infoOpen.value = true }
+function openEdit(row: UpdatePackage) { selectedPackage.value = row; editName.value = row.name; editVersion.value = row.version; editNote.value = row.note; editOpen.value = true }
+function saveEdit() {
+  if (!selectedPackage.value || !editName.value.trim() || !editVersion.value.trim()) return toast.error('Заполните название и версию')
+  selectedPackage.value.name = editName.value.trim(); selectedPackage.value.version = editVersion.value.trim(); selectedPackage.value.note = editNote.value.trim()
+  editOpen.value = false; toast.success('Обновление изменено')
 }
-
-function deleteUpdate() {
-  if (!selectedUpdate.value) return
-  rows.value = rows.value.filter(row => row.id !== selectedUpdate.value?.id)
-  deleteOpen.value = false
-  selectedUpdate.value = null
+function downloadPackage(row: UpdatePackage) {
+  if (!row.fileUrl) return toast.error('В демо-записи файл недоступен для скачивания')
+  const link = document.createElement('a'); link.href = row.fileUrl; link.download = row.fileName; link.click()
 }
-
-function openPublish() {
-  product.value = 'Цех'
-  version.value = ''
-  notes.value = ''
-  selectedFile.value = null
-  error.value = ''
-  modalOpen.value = true
+function removePackage() {
+  if (!selectedPackage.value) return
+  if (selectedPackage.value.fileUrl) URL.revokeObjectURL(selectedPackage.value.fileUrl)
+  packages.value = packages.value.filter(row => row.id !== selectedPackage.value?.id)
+  deleteOpen.value = false; toast.success('Пакет удалён')
 }
-
-defineExpose({ openPublish })
-
-function onFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  selectedFile.value = input.files?.[0] ?? null
-  error.value = ''
-}
-
-async function publishUpdate() {
-  const file = selectedFile.value
-  if (!version.value.trim() || !file || !notes.value.trim()) {
-    error.value = 'Укажите версию, выберите EXE и добавьте описание обновления.'
-    return
-  }
-  if (!file.name.toLowerCase().endsWith('.exe')) {
-    error.value = 'Выберите файл с расширением .exe.'
-    return
-  }
-
-  loading.value = true
-  error.value = ''
-  await new Promise(resolve => setTimeout(resolve, 900))
-  rows.value.unshift({
-    id: crypto.randomUUID(),
-    product: product.value,
-    version: version.value.trim(),
-    file: file.name,
-    published: new Date().toLocaleString('ru-RU'),
-    status: 'Демо',
-    notes: notes.value.trim(),
-  })
-  loading.value = false
-  modalOpen.value = false
+function addPackage() {
+  if (!file.value || !name.value.trim() || !version.value.trim()) return toast.error('Укажите название и версию, затем выберите EXE-файл')
+  packages.value.unshift({ id: Date.now(), name: name.value.trim(), direction: direction.value, version: version.value.trim(), fileName: file.value.name, size: file.value.size, note: note.value.trim(), uploadedAt: new Date().toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }), fileUrl: URL.createObjectURL(file.value) })
+  addOpen.value = false; file.value = null; name.value = ''; version.value = ''; note.value = ''
+  toast.success('Пакет добавлен в демо-список')
 }
 </script>
 
 <template>
-  <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <header class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-semibold">Обновления</h2></header>
-    <div class="p-4 sm:p-5">
-      <BaseTable :columns="columns" :rows="rows" row-key="id">
-        <template #cell-file="{ value }"><span class="font-mono text-xs">{{ value }}</span></template>
-        <template #cell-notes="{ value }"><span class="block max-w-xs truncate" :title="String(value || '')">{{ value || '—' }}</span></template>
-        <template #cell-status="{ value }"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">{{ value }}</span></template>
-        <template #cell-actions="{ row }">
-          <div class="flex items-center gap-2">
-            <button type="button" class="inline-grid size-9 place-items-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" :aria-label="`Информация об обновлении ${row.version}`" title="Информация" @click="showDetails(row)">
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5m0-8h.01" /></svg>
-            </button>
-            <button type="button" class="inline-grid size-9 place-items-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400" :aria-label="`Удалить обновление ${row.version}`" title="Удалить" @click="askDelete(row)">
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16m-10 4v6m4-6v6M5 7l1 13h12l1-13M9 7V4h6v3" /></svg>
-            </button>
-          </div>
-        </template>
-      </BaseTable>
+  <section class="space-y-5">
+    <div class="space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3"><h2 class="text-lg font-semibold">Пакеты обновлений</h2><Button @click="addOpen = true"><PackagePlus class="size-4" />Добавить обновление</Button></div>
+      <div class="overflow-x-auto rounded-lg border bg-background">
+        <Table>
+          <TableHeader><TableRow class="h-12"><TableHead>№</TableHead><TableHead>Название</TableHead><TableHead>Направление</TableHead><TableHead>Версия</TableHead><TableHead>EXE-файл</TableHead><TableHead>Размер</TableHead><TableHead>Заметка</TableHead><TableHead>Добавлено</TableHead><TableHead class="text-right">Действия</TableHead></TableRow></TableHeader>
+          <TableBody>
+            <TableRow v-for="(row, index) in visiblePackages" :key="row.id" class="h-14"><TableCell class="text-muted-foreground">{{ (packagePage - 1) * packagePageSize + index + 1 }}</TableCell><TableCell class="font-medium">{{ row.name }}</TableCell><TableCell>{{ row.direction }}</TableCell><TableCell>{{ row.version }}</TableCell><TableCell class="font-mono text-xs">{{ row.fileName }}</TableCell><TableCell class="whitespace-nowrap">{{ fileSize(row.size) }}</TableCell><TableCell class="max-w-56 truncate">{{ row.note || '—' }}</TableCell><TableCell class="whitespace-nowrap">{{ row.uploadedAt }}</TableCell><TableCell><div class="flex justify-end"><Button size="icon" variant="ghost" :disabled="!row.fileUrl" :aria-label="`Скачать ${row.fileName}`" title="Скачать EXE" @click="downloadPackage(row)"><Download class="size-4 text-emerald-600" /></Button><Button size="icon" variant="ghost" :aria-label="`Редактировать ${row.name}`" title="Редактировать" @click="openEdit(row)"><Pencil class="size-4 text-blue-600" /></Button><Button size="icon" variant="ghost" :aria-label="`Информация о версии ${row.version}`" title="Клиенты на версии" @click="openInfo(row)"><Info class="size-4 text-sky-600" /></Button><Button size="icon" variant="ghost" :aria-label="`Удалить ${row.name}`" title="Удалить" @click="selectedPackage = row; deleteOpen = true"><Trash2 class="size-4 text-rose-600" /></Button></div></TableCell></TableRow>
+            <TableRow v-if="!packages.length"><TableCell colspan="9" class="h-24 text-center text-muted-foreground">Пакеты ещё не добавлены</TableCell></TableRow>
+          </TableBody>
+        </Table>
+      </div>
+      <TablePagination v-model:page="packagePage" v-model:page-size="packagePageSize" :total="packages.length" />
     </div>
+
+    <Dialog v-model:open="addOpen"><DialogContent><DialogHeader><DialogTitle>Добавить обновление</DialogTitle><DialogDescription>Выберите направление, EXE-файл и укажите версию с заметкой.</DialogDescription></DialogHeader>
+      <div class="space-y-4 py-2"><div class="space-y-2"><Label for="update-direction">Направление</Label><select id="update-direction" v-model="direction" class="h-10 w-full rounded-md border bg-background px-3 text-sm"><option>Цех</option><option>Шаурма</option></select></div><div class="space-y-2"><Label for="update-name">Название обновления</Label><Input id="update-name" v-model="name" placeholder="Например, Обновление Цеха" /></div><div class="space-y-2"><Label for="update-version">Версия</Label><Input id="update-version" v-model="version" placeholder="Например, 1.2.0" /></div><div class="space-y-2"><Label for="update-exe">EXE-файл</Label><Input id="update-exe" type="file" accept=".exe,application/vnd.microsoft.portable-executable" class="file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1" @change="chooseFile" /><p v-if="file" class="text-xs text-muted-foreground"><Upload class="mr-1 inline size-3" />{{ file.name }} · {{ fileSize(file.size) }}</p></div><div class="space-y-2"><Label for="update-note">Заметка</Label><Textarea id="update-note" v-model="note" placeholder="Что изменилось в этой версии?" /></div><p class="text-xs text-muted-foreground">Загруженный файл хранится только в этой сессии демо.</p></div>
+      <DialogFooter><Button variant="outline" @click="addOpen = false">Отмена</Button><Button :disabled="!file || !name.trim() || !version.trim()" @click="addPackage">Добавить пакет</Button></DialogFooter>
+    </DialogContent></Dialog>
+
+    <Dialog v-model:open="infoOpen"><DialogContent><DialogHeader><DialogTitle>Клиенты на версии {{ selectedPackage?.version }}</DialogTitle><DialogDescription>{{ selectedPackage?.direction }} · {{ selectedPackage?.fileName }} · {{ fileSize(selectedPackage?.size ?? 0) }}</DialogDescription></DialogHeader><p v-if="selectedPackage?.note" class="rounded-md bg-muted/50 p-3 text-sm">{{ selectedPackage.note }}</p><div class="max-h-64 overflow-y-auto rounded-lg border"><Table><TableHeader><TableRow><TableHead>Клиент</TableHead><TableHead>Устройство</TableHead><TableHead>Версия</TableHead><TableHead>Обновлено</TableHead></TableRow></TableHeader><TableBody><TableRow v-for="row in visibleInfoClients" :key="row.id"><TableCell class="font-medium">{{ row.client }}</TableCell><TableCell class="font-mono text-xs">{{ row.device }}</TableCell><TableCell>{{ row.version }}</TableCell><TableCell class="whitespace-nowrap">{{ row.versionUpdatedAt }}</TableCell></TableRow><TableRow v-if="!updatedClients.length"><TableCell colspan="4" class="h-20 text-center text-muted-foreground">Клиенты ещё не обновлялись этим пакетом</TableCell></TableRow></TableBody></Table></div><TablePagination v-if="updatedClients.length" v-model:page="infoPage" v-model:page-size="infoPageSize" :total="updatedClients.length" /><DialogFooter><Button variant="outline" @click="infoOpen = false">Закрыть</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog v-model:open="editOpen"><DialogContent><DialogHeader><DialogTitle>Редактировать обновление</DialogTitle><DialogDescription>Измените название, версию и заметку пакета.</DialogDescription></DialogHeader><div class="space-y-4 py-2"><div class="space-y-2"><Label for="edit-update-name">Название</Label><Input id="edit-update-name" v-model="editName" /></div><div class="space-y-2"><Label for="edit-update-version">Версия</Label><Input id="edit-update-version" v-model="editVersion" /></div><div class="space-y-2"><Label for="edit-update-note">Заметка</Label><Textarea id="edit-update-note" v-model="editNote" /></div></div><DialogFooter><Button variant="outline" @click="editOpen = false">Отмена</Button><Button @click="saveEdit">Сохранить</Button></DialogFooter></DialogContent></Dialog>
+    <AlertDialog v-model:open="deleteOpen"><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Удалить пакет обновления?</AlertDialogTitle><AlertDialogDescription>«{{ selectedPackage?.name }}» будет удалён из списка.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Отмена</AlertDialogCancel><AlertDialogAction class="bg-destructive text-destructive-foreground hover:bg-destructive/90" @click="removePackage">Удалить</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </section>
-
-  <BaseModal :open="modalOpen" title="Опубликовать обновление" @close="!loading && (modalOpen = false)">
-    <form class="space-y-4" @submit.prevent="publishUpdate">
-      <div>
-        <label for="update-product" class="mb-1.5 block text-sm font-medium text-slate-700">Направление</label>
-        <select id="update-product" v-model="product" class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" :disabled="loading">
-          <option value="Цех">Цех</option>
-          <option value="Шаурма">Шаурма</option>
-        </select>
-      </div>
-      <div>
-        <label for="update-version" class="mb-1.5 block text-sm font-medium text-slate-700">Версия</label>
-        <input id="update-version" v-model="version" required placeholder="Например, 1.0.2" class="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" :disabled="loading" />
-      </div>
-      <div>
-        <label for="update-file" class="mb-1.5 block text-sm font-medium text-slate-700">Файл EXE</label>
-        <input id="update-file" type="file" accept=".exe,application/vnd.microsoft.portable-executable" required class="block w-full rounded-lg border border-slate-300 bg-white text-sm file:mr-3 file:border-0 file:bg-slate-50 file:px-3 file:py-2.5 file:font-medium" :disabled="loading" @change="onFileChange" />
-        <p v-if="selectedFile" class="mt-1.5 truncate text-xs text-slate-500">{{ selectedFile.name }}</p>
-      </div>
-      <div>
-        <label for="update-notes" class="mb-1.5 block text-sm font-medium text-slate-700">Что нового</label>
-        <textarea id="update-notes" v-model="notes" required rows="3" maxlength="1000" placeholder="Краткое описание обновления" class="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" :disabled="loading" />
-      </div>
-      <p v-if="error" role="alert" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{{ error }}</p>
-      <p class="text-xs leading-5 text-slate-500">В демо-режиме файл не отправляется на сервер; в таблицу добавятся его имя и данные версии.</p>
-      <footer class="flex justify-end gap-2 pt-1">
-        <BaseButton type="button" :disabled="loading" @click="modalOpen = false">Отмена</BaseButton>
-        <BaseButton type="submit" variant="primary" :disabled="loading">
-          <span class="inline-flex items-center gap-2">
-            <svg v-if="loading" aria-hidden="true" class="size-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4Z" /></svg>
-            {{ loading ? 'Загружаю…' : 'Обновить' }}
-          </span>
-        </BaseButton>
-      </footer>
-    </form>
-  </BaseModal>
-  <BaseModal :open="detailsOpen" title="Информация об обновлении" @close="detailsOpen = false">
-    <dl v-if="selectedUpdate" class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
-      <dt class="text-slate-500">Направление</dt><dd class="font-medium text-slate-900">{{ selectedUpdate.product }}</dd>
-      <dt class="text-slate-500">Версия</dt><dd class="font-medium text-slate-900">{{ selectedUpdate.version }}</dd>
-      <dt class="text-slate-500">Файл</dt><dd class="break-all font-mono text-xs text-slate-800">{{ selectedUpdate.file }}</dd>
-      <dt class="text-slate-500">Опубликована</dt><dd class="text-slate-800">{{ selectedUpdate.published }}</dd>
-      <dt class="text-slate-500">Статус</dt><dd class="text-slate-800">{{ selectedUpdate.status }}</dd>
-      <dt class="text-slate-500">Заметка</dt><dd class="whitespace-pre-wrap text-slate-800">{{ selectedUpdate.notes || '—' }}</dd>
-    </dl>
-    <template #footer><BaseButton @click="detailsOpen = false">Закрыть</BaseButton></template>
-  </BaseModal>
-
-  <BaseModal :open="deleteOpen" title="Удалить обновление?" @close="deleteOpen = false">
-    <p class="text-sm leading-6 text-slate-600">Удалить версию <span class="font-semibold text-slate-900">{{ selectedUpdate?.version }}</span> для направления <span class="font-semibold text-slate-900">{{ selectedUpdate?.product }}</span> из списка?</p>
-    <template #footer>
-      <BaseButton @click="deleteOpen = false">Отмена</BaseButton>
-      <BaseButton variant="danger" @click="deleteUpdate">Удалить</BaseButton>
-    </template>
-  </BaseModal>
 </template>

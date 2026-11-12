@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@obshaya/ui": ["./index.ts"],
+      "@obshaya/ui/*": ["./*"]
+    }
+  }
+}

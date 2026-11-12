@@ -1,6 +1,12 @@
 <template>
-  <main class="min-h-screen bg-slate-100 p-8 text-slate-900">
-    <h1 class="text-2xl font-semibold">Шаурмичная</h1>
-    <p class="mt-2 text-slate-600">Каркас приложения. Разделы и данные шаурмичной будут размещаться отдельно.</p>
+  <main class="placeholder">
+    <h1>Шаурмичная</h1>
+    <p>Новый интерфейс будет создан здесь.</p>
   </main>
 </template>
+
+<style scoped>
+.placeholder { display: grid; min-height: 100vh; place-content: center; padding: 2rem; color: #334155; text-align: center; font-family: system-ui, sans-serif; }
+h1 { margin: 0; font-size: 1.75rem; font-weight: 600; }
+p { margin: .5rem 0 0; color: #64748b; }
+</style>
