@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "obshaya-programma-admin",
+  "compatibility_date": "2025-07-15",
+  "assets": {
+    "directory": "./.output/public",
+    "not_found_handling": "single-page-application"
+  }
+}

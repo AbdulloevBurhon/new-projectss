@@ -6,3 +6,5 @@ export interface DeviceIdentity {
   installationId: string
   product: ProductId
 }
+
+export type { AdminClient, AdminMessage, AdminRequest, AdminUpdate } from './admin'

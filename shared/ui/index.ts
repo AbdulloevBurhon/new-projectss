@@ -1,3 +1,4 @@
+export { DataTable } from './components/ui/data-table'
 export { Badge, badgeVariants } from './components/ui/badge'
 export { Button, buttonVariants } from './components/ui/button'
 export {
@@ -114,3 +115,21 @@ export {
   TooltipTrigger,
 } from './components/ui/tooltip'
 export * from './components/ui/avatar'
+
+export { TablePagination } from './components/ui/table-pagination'
+
+export { SidebarLayout } from './components/sidebar-layout'
+
+export { PinAccess } from './components/pin-access'
+export { ActivationFlow } from './components/activation-flow'
+export { default as ClientMessages } from './components/client-messages/ClientMessages.vue'
+
+export {
+  SettingsWorkspace,
+  PinSettingsCard,
+  ProgramUpdateCard,
+  DataArchiveCard,
+  StorageLocationsCard,
+  BackupScheduleCard,
+} from './components/settings-workspace'
+export type { BackupSchedule } from './components/settings-workspace'
