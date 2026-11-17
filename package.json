@@ -15,6 +15,8 @@
     "dev:tsekh": "npm run dev --workspace @obshaya/tsekh",
     "dev:shawarma": "npm run dev --workspace @obshaya/shawarma",
     "dev:production": "npm run dev --workspace @obshaya/production -- --port 3003",
+    "create:direction": "node scripts/direction.mjs create",
+    "remove:direction": "node scripts/direction.mjs remove",
     "dev:worker": "npm run dev --workspace @obshaya/worker"
   },
   "devDependencies": {

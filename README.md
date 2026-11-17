@@ -37,6 +37,29 @@ npm.cmd ci
 
 Корневые команды `npm.cmd run dev:tsekh`, `npm.cmd run dev:shawarma` и `npm.cmd run dev:admin` тоже запускают соответствующие приложения. Без явного порта используйте адрес, который вывел Nuxt.
 
+## Создание нового направления
+
+Из корня репозитория создайте приложение на основе `production`:
+
+```powershell
+npm run create:direction -- bakery "Пекарня"
+npm run dev:bakery
+```
+
+Укажите уникальный ID латиницей в нижнем регистре. Команда создаёт отдельную Nuxt-папку, копирует PIN-доступ, настройки, архивы и склады, меняет ID приложения, добавляет workspace и регистрирует направление для лицензий и админки. Новое приложение использует тот же Cloudflare API, что и остальные. Складские записи хранятся локально в браузере; архивы можно загрузить в облако из настроек.
+
+Чтобы новые направления принимались базой данных, один раз примените миграцию, удаляющую старое ограничение списка ID, и разверните обновлённый API. После генерации каждого направления разверните API и админку, чтобы облачные версии получили его регистрацию:
+
+```powershell
+npm.cmd exec --workspace @obshaya/worker -- wrangler d1 migrations apply tsekh4-licenses --remote
+npm.cmd exec --workspace @obshaya/worker -- wrangler deploy
+$env:VITE_ADMIN_API_BASE = 'https://obshaya-programma-api.burhon-2001-tjk.workers.dev'
+npm.cmd exec --workspace @obshaya/admin -- nuxt generate
+npm.cmd exec --workspace @obshaya/worker -- wrangler deploy --config ../../admin/wrangler.jsonc
+```
+
+Удалите созданное направление командой `npm run remove:direction -- bakery` и подтвердите операцию, точно введя `REMOVE bakery`. Встроенные `tsekh`, `shawarma` и `production` защищены. Удаляется локальный проект и его регистрации; облачные лицензии, архивы и файлы обновлений сохраняются, чтобы случайно не потерять клиентские данные.
+
 | Маршрут клиента | Экран |
 | --- | --- |
 | `/` | Главная страница |
