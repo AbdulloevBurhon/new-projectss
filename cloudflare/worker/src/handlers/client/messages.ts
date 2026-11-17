@@ -1,4 +1,5 @@
 import type { Env } from '../../types'
+import { isProductId, type ProductId } from '@obshaya/contracts'
 import { createId } from '../../utils/crypto'
 import { findClientLicense } from '../../services/client-license'
 import { json, readJson } from '../../utils/http'
@@ -28,9 +29,9 @@ export async function handleClientMessages(request: Request, env: Env) {
 }
 
 export async function handleClientSupport(request: Request, env: Env) {
-  const body = await readJson<{ installationId: string; product: 'tsekh' | 'shawarma'; body: string }>(request)
+  const body = await readJson<{ installationId: string; product: ProductId; body: string }>(request)
   const text = body.body?.trim()
-  if (!body.installationId || !['tsekh', 'shawarma'].includes(body.product) || !text || text.length > 1000) return json({ error: 'Проверьте направление и текст сообщения (до 1000 символов)' }, 400)
+  if (!body.installationId || !isProductId(body.product) || !text || text.length > 1000) return json({ error: 'Проверьте направление и текст сообщения (до 1000 символов)' }, 400)
   const license = await env.DB.prepare("SELECT id FROM app_licenses WHERE installation_id=? AND product=? AND status='active' AND license_until>? LIMIT 1")
     .bind(body.installationId, body.product, new Date().toISOString()).first<{ id: string }>()
   if (!license) return json({ error: 'Активная лицензия не найдена' }, 403)

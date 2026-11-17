@@ -1,9 +1,10 @@
 import type { Env, ProductId } from '../../types'
+import { productLabels } from '@obshaya/contracts'
 import { createId, randomPin, sha256 } from '../../utils/crypto'
 import { json, readJson } from '../../utils/http'
 
 interface DecisionBody { action: 'approve' | 'reject'; clientName?: string; licenseDays?: number }
-const productName: Record<ProductId, string> = { tsekh: 'Цех', shawarma: 'Шаурма' }
+const productName = productLabels
 
 export async function handleRequests(request: Request, env: Env, id?: string) {
   if (!id && request.method === 'GET') {

@@ -35,6 +35,8 @@ All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_API_KEY>`.
 
 Client routes use `X-Installation-Id` and `X-Client-Pin`; they cover activation, PIN checks, messages, update listing/download/receipts and JSON archive upload.
 
+- `PUT /api/client/archives/latest` replaces the scheduled archive for the authenticated installation. It uses the existing D1 schema and R2 binding. `POST /api/client/archives` continues to create a separate manual archive.
+
 ## Current boundary
 
 The admin UI and API handlers are connected to D1/R2. The client endpoints are prepared, but the desktop/client activation, PIN, message, update and archive screens still need to call these endpoints before the complete end-to-end flow is live. Apply the migration and deploy the Worker only after reviewing the changes and setting the secret.

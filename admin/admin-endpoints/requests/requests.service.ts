@@ -1,8 +1,6 @@
-import type { AdminRequest } from '@obshaya/contracts'
+import { productLabels as names, type AdminRequest } from '@obshaya/contracts'
 import type { RequestDecision, RequestRow } from './requests.types'
 import { adminApi } from '../core/admin-api'
-
-const names = { tsekh: 'Цех', shawarma: 'Шаурма' }
 
 export async function listRequests(): Promise<RequestRow[]> {
   const rows = await adminApi<AdminRequest[]>('/requests')

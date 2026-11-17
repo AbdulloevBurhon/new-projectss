@@ -1,10 +1,8 @@
+import { isProductId, productLabels } from '@obshaya/contracts'
 import type { Env, ProductId } from '../../types'
 import { createId, sha256 } from '../../utils/crypto'
 import { findClientLicense } from '../../services/client-license'
 import { corsHeaders, json, readJson } from '../../utils/http'
-
-const products: Record<string, ProductId> = { 'Цех': 'tsekh', 'Шаурма': 'shawarma', tsekh: 'tsekh', shawarma: 'shawarma' }
-const labels: Record<ProductId, string> = { tsekh: 'Цех', shawarma: 'Шаурма' }
 
 export async function handleUpdates(request: Request, env: Env, id?: string, action?: string, clientRequest = false) {
   if (!id && request.method === 'GET') {
@@ -32,7 +30,10 @@ export async function handleUpdates(request: Request, env: Env, id?: string, act
 }
 
 async function uploadUpdate(request: Request, env: Env) {
-  const form = await request.formData(); const product = products[String(form.get('product') ?? '')]
+  const form = await request.formData()
+  const direction = form.get('product')
+  const product = isProductId(direction) ? direction : Object.keys(productLabels)
+    .filter(isProductId).find(id => productLabels[id] === direction)
   const name = String(form.get('name') ?? '').trim().slice(0, 120); const version = String(form.get('version') ?? '').trim(); const note = String(form.get('note') ?? '').trim().slice(0, 2000)
   const file = form.get('file')
   if (!product || !version || !(file instanceof File) || !file.name.toLowerCase().endsWith('.exe')) return json({ error: 'Укажите направление, версию и EXE-файл' }, 400)
@@ -47,7 +48,7 @@ async function uploadUpdate(request: Request, env: Env) {
     if (error instanceof Error && error.message.includes('UNIQUE constraint failed')) return json({ error: 'Такая версия уже опубликована для этого направления' }, 409)
     throw error
   }
-  return json({ id, productId: product, name: name || file.name.replace(/\.exe$/i, ''), direction: labels[product], version, fileName: file.name, size: file.size, note, uploadedAt: new Date().toISOString() }, 201)
+  return json({ id, productId: product, name: name || file.name.replace(/\.exe$/i, ''), direction: productLabels[product], version, fileName: file.name, size: file.size, note, uploadedAt: new Date().toISOString() }, 201)
 }
 
 async function downloadUpdate(request: Request, env: Env, id: string, clientRequest: boolean) {

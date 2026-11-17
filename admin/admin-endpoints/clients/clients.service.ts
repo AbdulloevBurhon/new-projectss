@@ -1,8 +1,6 @@
-import type { AdminClient } from '@obshaya/contracts'
+import { productLabels as labels, type AdminClient } from '@obshaya/contracts'
 import type { ClientRow } from './clients.types'
 import { adminApi } from '../core/admin-api'
-
-const labels = { tsekh: 'Цех', shawarma: 'Шаурма' }
 
 export async function listClients(): Promise<ClientRow[]> {
   const rows = await adminApi<AdminClient[]>('/clients')

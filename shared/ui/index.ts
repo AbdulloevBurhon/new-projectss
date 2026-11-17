@@ -131,5 +131,8 @@ export {
   DataArchiveCard,
   StorageLocationsCard,
   BackupScheduleCard,
+  useArchiveFolders,
+  scheduledArchiveKey,
+  useScheduledArchive,
 } from './components/settings-workspace'
 export type { BackupSchedule } from './components/settings-workspace'

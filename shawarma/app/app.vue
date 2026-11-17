@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ClientMessages, SidebarLayout, Toaster } from '@obshaya/ui'
+import { ClientMessages, SidebarLayout, Toaster, scheduledArchiveKey, useScheduledArchive } from '@obshaya/ui'
 import { clientApi, getClientPin, installationId, temporaryPinExpired, type ActivationStatus } from '@obshaya/contracts/client-api'
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, provide } from 'vue'
 import { usePinAccess } from './features/access/composables/usePinAccess'
 
 const route = useRoute()
@@ -11,9 +11,14 @@ const license = useCookie<string | null>('shawarma_license_active')
 const licenseUntil = useCookie<string | null>('shawarma_license_until')
 const access = useCookie<string | null>('shawarma_pin_access')
 const apiBase = useRuntimeConfig().public.licenseApiBase as string
+provide(scheduledArchiveKey, useScheduledArchive('shawarma', apiBase, () =>
+  license.value === '1' && access.value === '1' && route.path !== '/pin'
+  && !route.path.startsWith('/activation') && !temporaryPinExpired() && !!getClientPin(),
+))
 let licenseTimer: ReturnType<typeof setInterval> | undefined
 const items = [
   { label: 'Главная', to: '/', icon: 'home' as const },
+  { label: 'Склады', to: '/warehouses', icon: 'warehouse' as const },
   { label: 'Настройки', to: '/settings', icon: 'settings' as const },
 ]
 
@@ -48,9 +53,7 @@ onBeforeUnmount(() => clearInterval(licenseTimer))
   <NuxtPage v-if="route.path === '/pin' || route.path.startsWith('/activation')" />
   <SidebarLayout v-else
     brand="Шаурмичная"
-    tagline="Управление программой"
     logo-text="Ш"
-    section-label="Разделы"
     :items="items"
     :active-path="route.path"
     workspace-title="Админ"

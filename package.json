@@ -5,6 +5,7 @@
     "admin",
     "tsekh",
     "shawarma",
+    "production",
     "cloudflare/worker",
     "shared/contracts",
     "shared/ui"
@@ -13,6 +14,7 @@
     "dev:admin": "npm run dev --workspace @obshaya/admin",
     "dev:tsekh": "npm run dev --workspace @obshaya/tsekh",
     "dev:shawarma": "npm run dev --workspace @obshaya/shawarma",
+    "dev:production": "npm run dev --workspace @obshaya/production -- --port 3003",
     "dev:worker": "npm run dev --workspace @obshaya/worker"
   },
   "devDependencies": {

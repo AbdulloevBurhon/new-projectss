@@ -7,6 +7,8 @@ import DataArchiveCard from './cards/DataArchiveCard.vue'
 withDefaults(defineProps<{
   productName: string
   currentVersion?: string
+  installUpdates?: boolean
+  installingUpdate?: boolean
   online?: boolean
   pinLength?: number
   cloudCopyEnabled?: boolean
@@ -37,8 +39,10 @@ const emit = defineEmits<{
       <TabsContent value="details" class="mt-0">
         <section class="grid auto-rows-fr items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Карточки настроек">
           <PinSettingsCard :product-name="productName" :pin-length="pinLength" @save="pin => emit('changePin', pin)" />
-          <ProgramUpdateCard :current-version="currentVersion" :online="online" :update-available="updateAvailable" @check="emit('checkUpdates')" @download="id => emit('downloadUpdate', id)" />
+          <ProgramUpdateCard :current-version="currentVersion" :online="online" :update-available="updateAvailable"
+            :install-updates="installUpdates" :installing="installingUpdate" @check="emit('checkUpdates')" @download="id => emit('downloadUpdate', id)" />
           <DataArchiveCard :online="online" :cloud-copy-enabled="cloudCopyEnabled" :uploading="uploadingArchive" @export="emit('exportData')" @import="file => emit('importData', file)" @toggle-cloud-copy="enabled => emit('toggleCloudCopy', enabled)" />
+          <slot />
         </section>
       </TabsContent>
     </Tabs>

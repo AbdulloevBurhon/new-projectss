@@ -1,4 +1,5 @@
 import type { Env, ProductId } from '../../types'
+import { isProductId } from '@obshaya/contracts'
 import { createId } from '../../utils/crypto'
 import { json, readJson } from '../../utils/http'
 
@@ -7,7 +8,7 @@ interface ActivationBody { installationId: string; product: ProductId; clientNam
 export async function handleActivation(request: Request, env: Env, installationId?: string) {
   if (request.method === 'POST' && !installationId) {
     const body = await readJson<ActivationBody>(request)
-    if (!body.installationId || !['tsekh', 'shawarma'].includes(body.product)) return json({ error: 'Укажите установку и направление' }, 400)
+    if (!body.installationId || !isProductId(body.product)) return json({ error: 'Укажите установку и направление' }, 400)
     const active = await env.DB.prepare("SELECT id FROM app_licenses WHERE installation_id=? AND status='active' AND license_until>?")
       .bind(body.installationId, new Date().toISOString()).first<{ id: string }>()
     if (active) return json({ status: 'approved', licenseId: active.id })

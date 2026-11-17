@@ -1,4 +1,4 @@
-const API_BASE = 'https://obshaya-programma-api.burhon-2001-tjk.workers.dev'
+const API_BASE = import.meta.env.VITE_ADMIN_API_BASE || 'https://obshaya-programma-api.burhon-2001-tjk.workers.dev'
 const TOKEN_KEY = 'obshaya-admin-key'
 let token = ''
 

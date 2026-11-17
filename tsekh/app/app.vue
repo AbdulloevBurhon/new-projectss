@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ClientMessages, SidebarLayout, Toaster } from '@obshaya/ui'
+import { ClientMessages, SidebarLayout, Toaster, scheduledArchiveKey, useScheduledArchive } from '@obshaya/ui'
 import { clientApi, getClientPin, installationId, temporaryPinExpired, type ActivationStatus } from '@obshaya/contracts/client-api'
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, provide } from 'vue'
 import { usePinAccess } from './features/access/composables/usePinAccess'
+import { reportInstalledUpdate } from '../endpoints/settings/updates/updates.service'
 
 const route = useRoute()
 const router = useRouter()
@@ -10,10 +11,15 @@ const { lock } = usePinAccess()
 const license = useCookie<string | null>('tsekh_license_active')
 const licenseUntil = useCookie<string | null>('tsekh_license_until')
 const access = useCookie<string | null>('tsekh_pin_access')
-const apiBase = useRuntimeConfig().public.licenseApiBase as string
+const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
+provide(scheduledArchiveKey, useScheduledArchive('tsekh', apiBase, () =>
+  license.value === '1' && access.value === '1' && route.path !== '/pin'
+  && !route.path.startsWith('/activation') && !temporaryPinExpired() && !!getClientPin(),
+))
 let licenseTimer: ReturnType<typeof setInterval> | undefined
 const items = [
   { label: 'Главная', to: '/', icon: 'home' as const },
+  { label: 'Склады', to: '/warehouses', icon: 'warehouse' as const },
   { label: 'Настройки', to: '/settings', icon: 'settings' as const },
 ]
 
@@ -35,6 +41,9 @@ async function refreshLicense() {
       license.value = null; licenseUntil.value = null; lock(); await router.push('/activation')
     } else if (status.licenseUntil) licenseUntil.value = status.licenseUntil
   } catch { /* Offline use remains available until the cached license expires. */ }
+  if (license.value === '1' && access.value === '1') {
+    await reportInstalledUpdate(apiBase, appVersion).catch(() => {})
+  }
 }
 
 onMounted(() => {

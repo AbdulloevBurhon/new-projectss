@@ -1,4 +1,6 @@
-export type ProductId = 'tsekh' | 'shawarma'
+import type { ProductId } from '@obshaya/contracts'
+
+export type { ProductId } from '@obshaya/contracts'
 interface D1Result<T = Record<string, unknown>> { results: T[]; success: boolean; meta: { changes: number } }
 interface D1Statement {
   bind(...values: unknown[]): D1Statement

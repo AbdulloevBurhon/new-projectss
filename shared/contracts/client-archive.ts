@@ -24,8 +24,10 @@ export async function restoreProductArchive(file: File, product: ProductId) {
   for (const [key, value] of Object.entries(parsed.entries)) localStorage.setItem(key, value as string)
 }
 
-export function uploadProductArchive(baseUrl: string, file: File, product: ProductId) {
+export function uploadProductArchive(baseUrl: string, file: File, product: ProductId, latest = false, signal?: AbortSignal) {
   const form = new FormData()
   form.set('file', file)
-  return clientApi<{ ok: true; id: string }>(baseUrl, '/api/client/archives', { method: 'POST', body: form }, product)
+  return clientApi<{ ok: true; id: string }>(baseUrl, latest ? '/api/client/archives/latest' : '/api/client/archives', {
+    method: latest ? 'PUT' : 'POST', body: form, signal,
+  }, product)
 }

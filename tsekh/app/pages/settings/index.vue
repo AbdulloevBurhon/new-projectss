@@ -1,15 +1,22 @@
 <script setup lang="ts">
-import { SettingsWorkspace } from '@obshaya/ui'
-import { clientApi, downloadClientFile, saveClientPin } from '@obshaya/contracts/client-api'
+import { BackupScheduleCard, SettingsWorkspace, StorageLocationsCard, scheduledArchiveKey, useArchiveFolders } from '@obshaya/ui'
+import { clientApi, saveClientPin } from '@obshaya/contracts/client-api'
 import { createProductArchive, restoreProductArchive, uploadProductArchive } from '@obshaya/contracts/client-archive'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
+import { desktopUpdates, findUpdate, installOrDownloadUpdate } from '../../../endpoints/settings/updates/updates.service'
+import type { ClientUpdate } from '../../../endpoints/settings/updates/updates.types'
 
-const apiBase = useRuntimeConfig().public.licenseApiBase as string
+const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
 const online = ref(false)
-const updateAvailable = ref<{ id: string; version: string; note: string } | null>(null)
+const updateAvailable = ref<ClientUpdate | null>(null)
+const installingUpdate = ref(false)
+const desktop = ref(false)
 const cloudCopyEnabled = ref(false)
 const uploadingArchive = ref(false)
+const { localFolder, secondaryFolder, chooseFolder } = useArchiveFolders('tsekh')
+const { schedule, last, saveSchedule, downloadLast } = inject(scheduledArchiveKey)!
+const lastBackup = computed(() => last.value && new Date(last.value.createdAt).toLocaleString('ru-RU'))
 const cloudCopyKey = 'obshaya:settings:tsekh:cloud-copy'
 const updateOnline = () => { online.value = navigator.onLine }
 
@@ -22,15 +29,23 @@ async function changePin(pin: string) {
 
 async function checkUpdates() {
   try {
-    const updates = await clientApi<Array<{ id: string; version: string; note: string }>>(apiBase, '/api/client/updates', {}, 'tsekh')
-    updateAvailable.value = updates[0] ?? null
+    updateAvailable.value = await findUpdate(apiBase, appVersion) ?? null
     toast.info(updateAvailable.value ? `Доступна версия ${updateAvailable.value.version}.` : 'Установлена последняя версия.')
   } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось проверить обновления.') }
 }
 
 async function downloadUpdate(id: string) {
-  try { await downloadClientFile(apiBase, `/api/client/updates/${id}/download`, 'tsekh'); toast.success('Файл обновления скачан. Установите его после закрытия программы.') }
-  catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось скачать обновление.') }
+  const update = updateAvailable.value
+  if (update?.id !== id || installingUpdate.value) return
+  installingUpdate.value = true
+  try {
+    await installOrDownloadUpdate(apiBase, update)
+    if (!desktop.value) toast.success('Файл обновления скачан.')
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Не удалось получить обновление.')
+  } finally {
+    installingUpdate.value = false
+  }
 }
 
 async function exportData() {
@@ -59,10 +74,18 @@ function setCloudCopy(enabled: boolean) {
   toast.success(enabled ? 'Облачная копия включена для следующего экспорта.' : 'Экспорт будет сохраняться только на устройстве.')
 }
 
-onMounted(() => { updateOnline(); cloudCopyEnabled.value = localStorage.getItem(cloudCopyKey) === 'true'; addEventListener('online', updateOnline); addEventListener('offline', updateOnline) })
+onMounted(() => { desktop.value = !!desktopUpdates(); updateOnline(); cloudCopyEnabled.value = localStorage.getItem(cloudCopyKey) === 'true'; addEventListener('online', updateOnline); addEventListener('offline', updateOnline) })
 onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEventListener('offline', updateOnline) })
 </script>
 
 <template>
-  <SettingsWorkspace product-name="Цех" :online="online" :update-available="updateAvailable" :cloud-copy-enabled="cloudCopyEnabled" :uploading-archive="uploadingArchive" @change-pin="changePin" @check-updates="checkUpdates" @download-update="downloadUpdate" @export-data="exportData" @import-data="importData" @toggle-cloud-copy="setCloudCopy" />
+  <SettingsWorkspace product-name="Цех" :current-version="appVersion" :install-updates="desktop" :installing-update="installingUpdate" :online="online" :update-available="updateAvailable" :cloud-copy-enabled="cloudCopyEnabled" :uploading-archive="uploadingArchive" @change-pin="changePin" @check-updates="checkUpdates" @download-update="downloadUpdate" @export-data="exportData" @import-data="importData" @toggle-cloud-copy="setCloudCopy">
+    <StorageLocationsCard
+      :local-path="localFolder?.name"
+      :secondary-path="secondaryFolder?.name"
+      @choose-local="chooseFolder('local')"
+      @choose-secondary="chooseFolder('secondary')"
+    />
+    <BackupScheduleCard :schedule="schedule" :last-backup="lastBackup" @save="saveSchedule" @download-last="downloadLast" />
+  </SettingsWorkspace>
 </template>

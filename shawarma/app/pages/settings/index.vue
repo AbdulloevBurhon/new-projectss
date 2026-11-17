@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { SettingsWorkspace } from '@obshaya/ui'
+import { BackupScheduleCard, SettingsWorkspace, StorageLocationsCard, scheduledArchiveKey, useArchiveFolders } from '@obshaya/ui'
 import { clientApi, downloadClientFile, saveClientPin } from '@obshaya/contracts/client-api'
+import { findClientUpdate, type ClientUpdate } from '@obshaya/contracts/client-updates'
 import { createProductArchive, restoreProductArchive, uploadProductArchive } from '@obshaya/contracts/client-archive'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 
-const apiBase = useRuntimeConfig().public.licenseApiBase as string
+const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
 const online = ref(false)
-const updateAvailable = ref<{ id: string; version: string; note: string } | null>(null)
+const updateAvailable = ref<ClientUpdate | null>(null)
+const downloadingUpdate = ref(false)
 const cloudCopyEnabled = ref(false)
 const uploadingArchive = ref(false)
+const { localFolder, secondaryFolder, chooseFolder } = useArchiveFolders('shawarma')
+const { schedule, last, saveSchedule, downloadLast } = inject(scheduledArchiveKey)!
+const lastBackup = computed(() => last.value && new Date(last.value.createdAt).toLocaleString('ru-RU'))
 const cloudCopyKey = 'obshaya:settings:shawarma:cloud-copy'
 const updateOnline = () => { online.value = navigator.onLine }
 
@@ -22,15 +27,17 @@ async function changePin(pin: string) {
 
 async function checkUpdates() {
   try {
-    const updates = await clientApi<Array<{ id: string; version: string; note: string }>>(apiBase, '/api/client/updates', {}, 'shawarma')
-    updateAvailable.value = updates[0] ?? null
+    updateAvailable.value = await findClientUpdate(apiBase, appVersion, 'shawarma') ?? null
     toast.info(updateAvailable.value ? `Доступна версия ${updateAvailable.value.version}.` : 'Установлена последняя версия.')
   } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось проверить обновления.') }
 }
 
 async function downloadUpdate(id: string) {
+  if (updateAvailable.value?.id !== id || downloadingUpdate.value) return
+  downloadingUpdate.value = true
   try { await downloadClientFile(apiBase, `/api/client/updates/${id}/download`, 'shawarma'); toast.success('Файл обновления скачан. Установите его после закрытия программы.') }
   catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось скачать обновление.') }
+  finally { downloadingUpdate.value = false }
 }
 
 async function exportData() {
@@ -64,5 +71,19 @@ onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEvent
 </script>
 
 <template>
-  <SettingsWorkspace product-name="Шаурмичная" :online="online" :update-available="updateAvailable" :cloud-copy-enabled="cloudCopyEnabled" :uploading-archive="uploadingArchive" @change-pin="changePin" @check-updates="checkUpdates" @download-update="downloadUpdate" @export-data="exportData" @import-data="importData" @toggle-cloud-copy="setCloudCopy" />
+  <SettingsWorkspace product-name="Шаурмичная" :current-version="appVersion" :installing-update="downloadingUpdate" :online="online" :update-available="updateAvailable" :cloud-copy-enabled="cloudCopyEnabled" :uploading-archive="uploadingArchive" @change-pin="changePin" @check-updates="checkUpdates" @download-update="downloadUpdate" @export-data="exportData" @import-data="importData" @toggle-cloud-copy="setCloudCopy">
+    <StorageLocationsCard
+      :local-path="localFolder?.name"
+      :secondary-path="secondaryFolder?.name"
+      @choose-local="chooseFolder('local')"
+      @choose-secondary="chooseFolder('secondary')"
+    />
+    <BackupScheduleCard
+      product-name="Шаурмичная"
+      :schedule="schedule"
+      :last-backup="lastBackup"
+      @save="saveSchedule"
+      @download-last="downloadLast"
+    />
+  </SettingsWorkspace>
 </template>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, House, LogOut, SlidersHorizontal } from '@lucide/vue'
+import { ChevronLeft, ChevronRight, House, LogOut, SlidersHorizontal, Warehouse } from '@lucide/vue'
 import { ref } from 'vue'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog'
 
-type SidebarItem = { label: string; to: string; icon: 'home' | 'settings' }
+const icons = { home: House, settings: SlidersHorizontal, warehouse: Warehouse }
+type SidebarItem = { label: string; to: string; icon: keyof typeof icons }
 
 const props = defineProps<{
   brand: string
@@ -46,7 +47,7 @@ function isActive(to: string) {
           :title="collapsed ? item.label : undefined"
           @click="emit('navigate', item.to)"
         >
-          <component :is="item.icon === 'home' ? House : SlidersHorizontal" :size="18" :stroke-width="1.8" />
+          <component :is="icons[item.icon]" :size="18" :stroke-width="1.8" />
           <span>{{ item.label }}</span>
         </button>
       </nav>

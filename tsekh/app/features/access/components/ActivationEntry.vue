@@ -5,7 +5,7 @@ import { toast } from '@obshaya/ui'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const product = 'tsekh' as const
-const apiBase = useRuntimeConfig().public.licenseApiBase as string
+const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
 const license = useCookie<string | null>('tsekh_license_active', { sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 * 5 })
 const licenseUntil = useCookie<string | null>('tsekh_license_until', { sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 * 10 })
 const phase = ref<'ready' | 'waiting' | 'approved' | 'rejected'>('ready')
@@ -45,7 +45,7 @@ async function requestAccess() {
   if (submitting.value) return
   submitting.value = true
   try {
-    await clientApi(apiBase, '/api/client/activation', { method: 'POST', body: JSON.stringify({ installationId: installationId(product), product, version: '0.1.0' }) })
+    await clientApi(apiBase, '/api/client/activation', { method: 'POST', body: JSON.stringify({ installationId: installationId(product), product, version: appVersion }) })
     phase.value = 'waiting'
     clearInterval(timer)
     timer = setInterval(() => void refreshStatus(), 5000)

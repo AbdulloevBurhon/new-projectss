@@ -42,10 +42,11 @@ export default {
       if (parts[2] === 'pin' && parts[3] === 'change' && request.method === 'POST') return changePin(request, env)
       if (parts[2] === 'support' && request.method === 'POST') return handleClientSupport(request, env)
       if (parts[2] === 'messages') return handleClientMessages(request, env)
-      if (parts[2] === 'updates' && request.method === 'GET') return listClientUpdates(request, env)
+      if (parts[2] === 'updates' && !parts[3] && request.method === 'GET') return listClientUpdates(request, env)
       if (parts[2] === 'updates' && parts[3] && parts[4] === 'download') return handleUpdates(request, env, parts[3], 'download', true)
       if (parts[2] === 'updates' && parts[3] && parts[4] === 'receipt') return handleUpdates(request, env, parts[3], 'receipt', true)
       if (parts[2] === 'archives' && request.method === 'POST') return uploadClientArchive(request, env)
+      if (parts[2] === 'archives' && parts[3] === 'latest' && request.method === 'PUT') return await uploadClientArchive(request, env, true)
     }
     return notFound()
     } catch (error) {
