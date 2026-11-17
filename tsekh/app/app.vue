@@ -20,6 +20,11 @@ let licenseTimer: ReturnType<typeof setInterval> | undefined
 const items = [
   { label: 'Главная', to: '/', icon: 'home' as const },
   { label: 'Склады', to: '/warehouses', icon: 'warehouse' as const },
+  { label: 'Счёт', to: '/accounts', icon: 'account' as const },
+  { label: 'Сотрудники', to: '/workers', icon: 'workers' as const },
+  { label: 'Продажа', to: '/sales', icon: 'sales' as const },
+  { label: 'Отчёты', to: '/reports', icon: 'reports' as const },
+  { label: 'Итоги', to: '/summary', icon: 'summary' as const },
   { label: 'Настройки', to: '/settings', icon: 'settings' as const },
 ]
 

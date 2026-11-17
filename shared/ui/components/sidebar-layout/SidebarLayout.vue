@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, House, LogOut, SlidersHorizontal, Warehouse } from '@lucide/vue'
+import { ChartColumn, ChartPie, ChevronLeft, ChevronRight, House, LogOut, ShoppingCart, SlidersHorizontal, Users, Wallet, Warehouse } from '@lucide/vue'
 import { ref } from 'vue'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog'
 
-const icons = { home: House, settings: SlidersHorizontal, warehouse: Warehouse }
+const icons = { home: House, settings: SlidersHorizontal, warehouse: Warehouse, account: Wallet, workers: Users, sales: ShoppingCart, reports: ChartColumn, summary: ChartPie }
 type SidebarItem = { label: string; to: string; icon: keyof typeof icons }
 
 const props = defineProps<{
