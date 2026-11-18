@@ -16,11 +16,22 @@ if (-not (Test-Path (Join-Path $public 'index.html'))) { throw 'Run Nuxt generat
 $version = '1.0.4129.50'
 $package = Join-Path $env:TEMP "tsekh-webview2.$version.nupkg"
 $url = "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$version/microsoft.web.webview2.$version.nupkg"
+$sqliteVersion = '1.0.119'
+$sqliteCorePackage = Join-Path $env:TEMP "tsekh-sqlite-core.$sqliteVersion.nupkg"
+$sqliteProviderPackage = Join-Path $env:TEMP "tsekh-sqlite-provider.$sqliteVersion.nupkg"
+if (-not (Test-Path $sqliteCorePackage)) {
+    Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/system.data.sqlite.core/$sqliteVersion/system.data.sqlite.core.$sqliteVersion.nupkg" -OutFile $sqliteCorePackage
+}
+if (-not (Test-Path $sqliteProviderPackage)) {
+    Invoke-WebRequest -Uri "https://api.nuget.org/v3-flatcontainer/stub.system.data.sqlite.core.netframework/$sqliteVersion/stub.system.data.sqlite.core.netframework.$sqliteVersion.nupkg" -OutFile $sqliteProviderPackage
+}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 try { $sdk = [IO.Compression.ZipFile]::OpenRead($package) } catch {
     Invoke-WebRequest -Uri $url -OutFile $package
     $sdk = [IO.Compression.ZipFile]::OpenRead($package)
 }
+$sqliteCore = [IO.Compression.ZipFile]::OpenRead($sqliteCorePackage)
+$sqliteProvider = [IO.Compression.ZipFile]::OpenRead($sqliteProviderPackage)
 $tempRoot = [IO.Path]::GetFullPath($env:TEMP)
 $stage = Join-Path $tempRoot ('tsekh-4-build-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $stage | Out-Null
@@ -29,10 +40,14 @@ try {
     $forms = Join-Path $stage 'Microsoft.Web.WebView2.WinForms.dll'
     $loader = Join-Path $stage 'WebView2Loader.dll'
     $license = Join-Path $stage 'WebView2-License.txt'
+    $sqliteAssembly = Join-Path $stage 'System.Data.SQLite.dll'
+    $sqliteNative = Join-Path $stage 'SQLite.Interop.dll'
     [IO.Compression.ZipFileExtensions]::ExtractToFile($sdk.GetEntry('lib/net462/Microsoft.Web.WebView2.Core.dll'), $core)
     [IO.Compression.ZipFileExtensions]::ExtractToFile($sdk.GetEntry('lib/net462/Microsoft.Web.WebView2.WinForms.dll'), $forms)
     [IO.Compression.ZipFileExtensions]::ExtractToFile($sdk.GetEntry('runtimes/win-x64/native/WebView2Loader.dll'), $loader)
     [IO.Compression.ZipFileExtensions]::ExtractToFile($sdk.GetEntry('LICENSE.txt'), $license)
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($sqliteProvider.GetEntry('lib/net40/System.Data.SQLite.dll'), $sqliteAssembly)
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($sqliteProvider.GetEntry('build/net40/x64/SQLite.Interop.dll'), $sqliteNative)
     $archive = Join-Path $stage 'renderer.zip'
     [IO.Compression.ZipFile]::CreateFromDirectory($public, $archive)
 
@@ -52,13 +67,16 @@ internal static class DesktopConfig { internal const string ApiBase = "$apiBase"
     $sources += $versionSource
     $bridge = Join-Path $PSScriptRoot 'bridge.js'
     & (Join-Path $framework 'csc.exe') /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 `
-        /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.IO.Compression.dll `
-        "/reference:$core" "/reference:$forms" "/resource:$core,Microsoft.Web.WebView2.Core.dll" "/resource:$forms,Microsoft.Web.WebView2.WinForms.dll" `
-        "/resource:$loader,WebView2Loader.dll" "/resource:$archive,renderer.zip" "/resource:$bridge,bridge.js" "/resource:$license,WebView2-License.txt" "/out:$artifact" @sources
+        /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Data.dll /reference:System.IO.Compression.dll `
+        "/reference:$core" "/reference:$forms" "/reference:$sqliteAssembly" "/resource:$core,Microsoft.Web.WebView2.Core.dll" "/resource:$forms,Microsoft.Web.WebView2.WinForms.dll" `
+        "/resource:$sqliteAssembly,System.Data.SQLite.dll" "/resource:$sqliteNative,SQLite.Interop.dll" "/resource:$loader,WebView2Loader.dll" `
+        "/resource:$archive,renderer.zip" "/resource:$bridge,bridge.js" "/resource:$license,WebView2-License.txt" "/out:$artifact" @sources
     if ($LASTEXITCODE -ne 0) { throw 'Windows application compilation failed.' }
     Get-Item -LiteralPath $artifact | Select-Object FullName, Length
 } finally {
     $sdk.Dispose()
+    $sqliteCore.Dispose()
+    $sqliteProvider.Dispose()
     $resolved = (Resolve-Path -LiteralPath $stage).Path
     if ($resolved.StartsWith($tempRoot.TrimEnd('\') + '\tsekh-4-build-', [StringComparison]::OrdinalIgnoreCase)) {
         Remove-Item -LiteralPath $resolved -Recurse -Force

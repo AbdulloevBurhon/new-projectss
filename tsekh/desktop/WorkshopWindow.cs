@@ -37,6 +37,8 @@ internal sealed class WorkshopWindow : Form
             var environment = await CoreWebView2Environment.CreateAsync(null, Path.Combine(root, "profile"));
             await webView.EnsureCoreWebView2Async(environment);
             var core = webView.CoreWebView2;
+            WorkshopApi.PrepareSqlite(root, Assembly.GetExecutingAssembly());
+            var api = new WorkshopApi(root);
             var assets = new WorkshopAssets(environment);
             var backups = new WorkshopBackups(this, root);
 
@@ -44,7 +46,11 @@ internal sealed class WorkshopWindow : Form
             core.Settings.AreHostObjectsAllowed = false;
             core.Settings.AreDevToolsEnabled = hidden;
             core.AddWebResourceRequestedFilter(WorkshopAssets.Origin + "/*", CoreWebView2WebResourceContext.All, CoreWebView2WebResourceRequestSourceKinds.All);
-            core.WebResourceRequested += assets.Serve;
+            core.WebResourceRequested += (s, e) =>
+            {
+                if (WorkshopApi.IsRequest(e.Request.Uri)) api.Serve(s, e);
+                else assets.Serve(s, e);
+            };
             core.NavigationStarting += (s, e) => { if (!WorkshopAssets.IsAppUrl(e.Uri)) e.Cancel = true; };
             core.NewWindowRequested += (s, e) => { e.Handled = true; };
             core.PermissionRequested += (s, e) => { e.State = CoreWebView2PermissionState.Deny; };

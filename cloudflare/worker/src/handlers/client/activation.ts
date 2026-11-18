@@ -27,6 +27,7 @@ export async function handleActivation(request: Request, env: Env, installationI
     const row = await env.DB.prepare(`SELECT r.status AS requestStatus, r.product AS productId, l.id AS licenseId,
       CASE WHEN l.status='active' AND l.license_until<=? THEN 'expired' ELSE l.status END AS licenseStatus,
       l.license_until AS licenseUntil,
+      l.cloud_archive_allowed AS cloudArchiveAllowed,
       CASE WHEN l.status='active' AND l.license_until>? THEN l.initial_pin ELSE NULL END AS initialPin
       FROM app_activation_requests r
       LEFT JOIN app_licenses l ON l.installation_id=r.installation_id

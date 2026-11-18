@@ -30,7 +30,7 @@ internal static class Program
             AppDomain.CurrentDomain.AssemblyResolve += (sender, eventArgs) =>
             {
                 string name = new AssemblyName(eventArgs.Name).Name;
-                if (name != "Microsoft.Web.WebView2.Core" && name != "Microsoft.Web.WebView2.WinForms") return null;
+                if (name != "Microsoft.Web.WebView2.Core" && name != "Microsoft.Web.WebView2.WinForms" && name != "System.Data.SQLite") return null;
                 using (Stream resource = assembly.GetManifestResourceStream(name + ".dll"))
                 using (var data = new MemoryStream())
                 {

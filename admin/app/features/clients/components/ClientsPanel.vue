@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, Copy, Ellipsis, Info, KeyRound, MessageSquare, Pencil, Power, Search, Trash2 } from '@lucide/vue'
+import { Archive, Check, Copy, Ellipsis, Info, KeyRound, MessageSquare, Pencil, Power, Search, ToggleLeft, ToggleRight, Trash2 } from '@lucide/vue'
 import { DataTable, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Input, Label, Textarea, toast } from '@obshaya/ui'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { clients } from '../../admin-state'
@@ -29,6 +29,7 @@ const messages = computed(() => selected.value ? conversations.value[selected.va
 const messageDeleteOpen = ref(false)
 const messageToDelete = ref<string | null>(null)
 const busy = ref(false)
+const archiveBusyId = ref<string | null>(null)
 const filtered = computed(() => clients.value.filter(row => `${row.client} ${row.direction} ${row.device}`.toLowerCase().includes(query.value.toLowerCase())))
 const clientColumns = [{ key: 'number', label: '№' }, { key: 'client', label: 'Клиент' }, { key: 'direction', label: 'Направление' }, { key: 'device', label: 'Устройство' }, { key: 'version', label: 'Версия EXE' }, { key: 'licenseFrom', label: 'Лицензия с' }, { key: 'licenseUntil', label: 'Лицензия до' }, { key: 'status', label: 'Статус' }, { key: 'actions', label: 'Действия', align: 'right' as const }]
 const historyColumns = [{ key: 'date', label: 'Дата' }, { key: 'from', label: 'Версия с' }, { key: 'to', label: 'Версия на' }]
@@ -54,6 +55,17 @@ async function changeStatus() {
   const activating = !selected.value.active
   try { await editClient(selected.value.id, { status: activating ? 'active' : 'disabled' }); statusOpen.value = false; await refreshClients(); toast.success(activating ? 'Клиент включён' : 'Клиент отключён') }
   catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось изменить статус') }
+}
+async function toggleCloudArchive(row: ClientItem) {
+  if (archiveBusyId.value) return
+  archiveBusyId.value = row.id
+  const enabled = !row.cloudArchiveAllowed
+  try {
+    await editClient(row.id, { cloudArchiveAllowed: enabled })
+    await refreshClients()
+    toast.success(enabled ? 'Облачный архив включён' : 'Облачный архив выключен')
+  } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось изменить разрешение архива') }
+  finally { archiveBusyId.value = null }
 }
 async function openPin(row: ClientItem) {
   selected.value = row; pinOpen.value = true; pinKind.value = 'temporary'; pinCode.value = ''; pinCopied.value = false
@@ -121,6 +133,7 @@ async function removeClient() {
           <DropdownMenuItem @click="openInfo(row)"><Info class="mr-2 size-4 text-sky-600" />Подробнее</DropdownMenuItem>
           <DropdownMenuItem @click="openEdit(row)"><Pencil class="mr-2 size-4 text-amber-600" />Изменить имя и срок</DropdownMenuItem>
           <DropdownMenuItem @click="openStatus(row)"><Power class="mr-2 size-4 text-emerald-600" />{{ row.active ? 'Отключить' : 'Включить' }}</DropdownMenuItem>
+          <DropdownMenuItem :disabled="archiveBusyId === row.id" @click="toggleCloudArchive(row)"><Archive class="mr-2 size-4 text-emerald-600" />Архив <ToggleRight v-if="row.cloudArchiveAllowed" class="ml-auto size-5 text-emerald-600" /><ToggleLeft v-else class="ml-auto size-5 text-slate-400" /></DropdownMenuItem>
           <DropdownMenuItem @click="openPin(row)"><KeyRound class="mr-2 size-4 text-violet-600" />Изменить PIN-код</DropdownMenuItem>
           <DropdownMenuItem @click="openLoginPin(row)"><KeyRound class="mr-2 size-4 text-emerald-600" />Выдать PIN для входа</DropdownMenuItem>
           <DropdownMenuItem @click="openMessages(row)"><MessageSquare class="mr-2 size-4 text-sky-600" />Сообщения</DropdownMenuItem>

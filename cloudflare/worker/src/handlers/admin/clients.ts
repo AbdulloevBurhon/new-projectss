@@ -2,12 +2,13 @@ import type { Env, LicenseRow } from '../../types'
 import { createId, randomPin, sha256 } from '../../utils/crypto'
 import { json, readJson } from '../../utils/http'
 
-interface ClientPatch { clientName?: string; licenseUntil?: string; status?: 'active' | 'disabled' }
+interface ClientPatch { clientName?: string; licenseUntil?: string; status?: 'active' | 'disabled'; cloudArchiveAllowed?: boolean }
 
 export async function handleClients(request: Request, env: Env, id?: string, action?: string) {
   if (!id && request.method === 'GET') {
     const result = await env.DB.prepare(`SELECT l.id, l.client_name AS clientName, l.product AS productId,
       l.installation_id AS installationId, l.license_from AS licenseFrom, l.license_until AS licenseUntil,
+      l.cloud_archive_allowed AS cloudArchiveAllowed,
       CASE WHEN l.status='active' AND l.license_until<=? THEN 'expired' ELSE l.status END AS status,
       l.current_version AS currentVersion, l.updated_at AS updatedAt,
       (SELECT COUNT(*) FROM app_messages m WHERE m.license_id=l.id AND m.sender='client' AND m.status='sent') AS unreadMessages
@@ -47,6 +48,7 @@ export async function handleClients(request: Request, env: Env, id?: string, act
     const fields: string[] = []; const values: unknown[] = []
     if (body.clientName?.trim()) { fields.push('client_name=?'); values.push(body.clientName.trim()) }
     if (body.licenseUntil && !Number.isNaN(Date.parse(body.licenseUntil))) { fields.push('license_until=?'); values.push(body.licenseUntil) }
+    if (typeof body.cloudArchiveAllowed === 'boolean') { fields.push('cloud_archive_allowed=?'); values.push(body.cloudArchiveAllowed ? 1 : 0) }
     if (body.status && ['active', 'disabled'].includes(body.status)) {
       fields.push(body.status === 'disabled' ? 'status=?, initial_pin=NULL' : 'status=?')
       values.push(body.status)

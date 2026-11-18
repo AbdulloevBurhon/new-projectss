@@ -18,6 +18,7 @@ export interface AdminClient {
   status: 'active' | 'disabled' | 'removed' | 'expired'
   licenseFrom: string
   licenseUntil: string
+  cloudArchiveAllowed: boolean | number
   currentVersion: string
   unreadMessages: number
 }

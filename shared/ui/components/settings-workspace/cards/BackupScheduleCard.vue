@@ -7,9 +7,10 @@ import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import type { BackupSchedule } from '../types'
 
-const emit = defineEmits<{ save: [schedule: BackupSchedule]; downloadLast: [] }>()
-const props = withDefaults(defineProps<{ schedule?: BackupSchedule; lastBackup?: string; productName?: string }>(), {
+const emit = defineEmits<{ save: [schedule: BackupSchedule]; downloadLast: []; cloudCopyDenied: [] }>()
+const props = withDefaults(defineProps<{ schedule?: BackupSchedule; lastBackup?: string; productName?: string; cloudArchiveAllowed?: boolean }>(), {
   productName: 'Цех',
+  cloudArchiveAllowed: true,
 })
 const cloudCopy = ref(false)
 const hours = ref<number | string>(0)
@@ -32,6 +33,10 @@ watch(() => props.schedule, (schedule) => {
 
 function saveSchedule() {
   if (!intervalValid.value) return
+  if (cloudCopy.value && !props.cloudArchiveAllowed) {
+    emit('cloudCopyDenied')
+    return
+  }
 
   emit('save', {
     intervalMinutes: Number(hours.value) * 60 + Number(minutes.value),
@@ -58,7 +63,7 @@ function saveSchedule() {
         </div>
         <p v-if="!intervalValid" class="text-xs text-red-600" role="alert">Укажите интервал до 24 часов и от 0 до 59 минут.</p>
       </fieldset>
-      <label class="flex items-center gap-2 text-sm"><input v-model="cloudCopy" type="checkbox" class="size-4 accent-lime-500">Копировать в облако</label>
+      <div class="space-y-1"><label class="flex items-center gap-2 text-sm"><input v-model="cloudCopy" type="checkbox" class="size-4 accent-lime-500">Копировать в облако</label><p v-if="!props.cloudArchiveAllowed" class="text-xs text-red-600" role="alert">Администратор запретил сохранять данные в облако.</p></div>
       <Button :disabled="!intervalValid" @click="saveSchedule"><Save :size="16" />Сохранить расписание</Button>
       <p v-if="lastBackup" class="text-sm text-slate-600">Последняя копия · {{ lastBackup }}</p>
       <Button v-if="lastBackup" variant="outline" @click="emit('downloadLast')">Скачать последнюю копию</Button>

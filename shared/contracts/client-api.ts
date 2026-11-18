@@ -9,6 +9,7 @@ export interface ActivationStatus {
   productId: ProductId
   licenseStatus: 'active' | 'disabled' | 'removed' | 'expired' | null
   licenseUntil: string | null
+  cloudArchiveAllowed?: boolean | number | null
   initialPin?: string | null
 }
 

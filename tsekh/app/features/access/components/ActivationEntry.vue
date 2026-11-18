@@ -37,7 +37,8 @@ async function refreshStatus() {
       license.value = null; licenseUntil.value = null; phase.value = 'rejected'; clearInterval(timer)
     }
   } catch (cause) {
-    if (!(cause instanceof Error && cause.message.includes('(404)'))) reportError(cause, 'Не удалось проверить лицензию.')
+    const message = cause instanceof Error ? cause.message.toLowerCase() : ''
+    if (!message.includes('(404)') && !message.includes('заявка не найдена')) reportError(cause, 'Не удалось проверить лицензию.')
   }
 }
 
@@ -54,6 +55,7 @@ async function requestAccess() {
 }
 
 async function continueToPin() {
+  if (!initialPin.value) return
   try {
     await clientApi(apiBase, `/api/client/activation/${installationId(product)}`, { method: 'POST' })
     initialPin.value = ''

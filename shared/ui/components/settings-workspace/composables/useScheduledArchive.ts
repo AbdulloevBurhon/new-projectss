@@ -31,8 +31,11 @@ export function useScheduledArchive(product: ProductId, apiBase: string, canRun:
       await uploadProductArchive(apiBase, file, product, true, AbortSignal.timeout(20_000))
       await writeBackupValues(product, { latest: { ...backup, cloudUploaded: true } })
       reportedCloudFailure = false
-    } catch {
-      if (!reportedCloudFailure) toast.error('Копия сохранена в браузере. Повторим отправку в облако.')
+    } catch (error) {
+      if (!reportedCloudFailure) {
+        const denied = error instanceof Error && error.message.includes('Администратор запретил')
+        toast.error(denied ? error.message : 'Копия сохранена в браузере. Повторим отправку в облако.')
+      }
       reportedCloudFailure = true
     }
   }

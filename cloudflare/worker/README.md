@@ -27,7 +27,7 @@ The admin UI currently calls `https://obshaya-programma-api.burhon-2001-tjk.work
 All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_API_KEY>`.
 
 - `GET /requests`, `PATCH /requests/:id` — pending activation requests and approval/rejection.
-- `GET /clients`, `PATCH /clients/:id`, `DELETE /clients/:id`, `POST /clients/:id/temporary-pin` — licenses, access, expiry and one-hour PIN reset.
+- `GET /clients`, `PATCH /clients/:id`, `DELETE /clients/:id`, `POST /clients/:id/temporary-pin` — licenses, access, expiry, cloud-archive permission and one-hour PIN reset.
 - `GET /clients/:id/messages`, `POST /clients/:id/messages`, `DELETE /messages/:id` — client support chat and read receipts.
 - `GET /notes`, `POST /notes`, `PATCH /notes/:id`, `DELETE /notes/:id` — admin notes.
 - `GET /updates`, `POST /updates`, `PATCH /updates/:id`, `DELETE /updates/:id`, `GET /updates/:id/receipts`, `GET /updates/:id/download` — R2 update packages and client status.
@@ -35,7 +35,7 @@ All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_API_KEY>`.
 
 Client routes use `X-Installation-Id` and `X-Client-Pin`; they cover activation, PIN checks, messages, update listing/download/receipts and JSON archive upload.
 
-- `PUT /api/client/archives/latest` replaces the scheduled archive for the authenticated installation. It uses the existing D1 schema and R2 binding. `POST /api/client/archives` continues to create a separate manual archive.
+- `PUT /api/client/archives/latest` replaces the scheduled archive for the authenticated installation. It uses the existing D1 schema and R2 binding. `POST /api/client/archives` continues to create a separate manual archive. Both uploads are rejected when the license has cloud archives disabled.
 
 ## Current boundary
 

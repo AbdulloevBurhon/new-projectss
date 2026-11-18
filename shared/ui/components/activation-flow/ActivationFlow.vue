@@ -41,8 +41,8 @@ const emit = defineEmits<{ request: []; continue: [] }>()
           <p class="mt-2 select-all font-mono text-3xl font-semibold tracking-[0.3em] text-slate-900">{{ initialPin }}</p>
           <p class="mt-2 text-xs text-green-800">Запишите его перед продолжением.</p>
         </div>
-        <div v-else class="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">PIN для этой лицензии ещё не подготовлен. Администратор может выдать его в списке клиентов.</div>
-        <Button class="mt-4 w-full bg-lime-400 text-slate-950 hover:bg-lime-500" @click="emit('continue')">Перейти ко входу</Button>
+        <div v-else class="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-900">Ожидаем PIN-код от сервера. Если он не появился, попросите администратора выдать новый PIN.</div>
+        <Button class="mt-4 w-full bg-lime-400 text-slate-950 hover:bg-lime-500" :disabled="!initialPin" @click="emit('continue')">{{ initialPin ? 'Перейти ко входу' : 'Ожидание PIN-кода…' }}</Button>
       </template>
     </section>
   </main>

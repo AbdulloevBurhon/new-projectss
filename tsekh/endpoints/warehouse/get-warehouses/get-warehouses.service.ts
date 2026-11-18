@@ -2,14 +2,14 @@ import { warehouseTypeLabels, type GetWarehousesResult, type Warehouse, type War
 
 export const warehousesKey = 'obshaya:data:tsekh:warehouses'
 
-export function getWarehouses(): GetWarehousesResult {
+export function getLegacyWarehouses(): GetWarehousesResult {
   const raw = localStorage.getItem(warehousesKey)
   if (raw === null) return []
 
   const rows: unknown = JSON.parse(raw)
   if (!Array.isArray(rows) || rows.some(row => !row || typeof row.id !== 'string'
       || typeof row.name !== 'string'
-      || (row.type !== undefined && !Object.hasOwn(warehouseTypeLabels, row.type)))) {
+      || (row.type != null && !Object.hasOwn(warehouseTypeLabels, row.type)))) {
     throw new Error('Не удалось прочитать сохранённые склады.')
   }
   return rows
@@ -18,16 +18,16 @@ export function getWarehouses(): GetWarehousesResult {
 export function validateWarehouseDraft(draft: WarehouseDraft): WarehouseDraft {
   const name = draft.name.trim()
   const { type } = draft
-  if (!name) throw new Error('Введите название склада.')
+  if (!name || name.length > 120) throw new Error('Название склада должно содержать от 1 до 120 символов.')
   if (!Object.hasOwn(warehouseTypeLabels, type)) throw new Error('Выберите тип склада.')
   return { name, type }
 }
 
-export async function changeWarehouses(change: (rows: Warehouse[]) => Warehouse[]): Promise<void> {
-  function save() {
-    const next = change(getWarehouses())
-    localStorage.setItem(warehousesKey, JSON.stringify(next))
-  }
+export function saveWarehouses(rows: GetWarehousesResult) {
+  const value = JSON.stringify(rows)
+  if (localStorage.getItem(warehousesKey) !== value) localStorage.setItem(warehousesKey, value)
+}
 
-  return navigator.locks ? navigator.locks.request(warehousesKey, save) : save()
+export function getWarehouses() {
+  return $fetch<GetWarehousesResult>('/api/warehouses')
 }

@@ -30,6 +30,7 @@ export interface LicenseRow {
   status: 'active' | 'disabled' | 'removed'
   license_from: string
   license_until: string
+  cloud_archive_allowed: number
   current_version: string
   updated_at: string
 }

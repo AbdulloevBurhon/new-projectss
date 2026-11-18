@@ -6,6 +6,7 @@ import { json } from '../../utils/http'
 export async function uploadClientArchive(request: Request, env: Env, latest = false) {
   const auth = await findClientLicense(request, env)
   if (!auth.license) return auth.response
+  if (!auth.license.cloud_archive_allowed) return json({ error: 'Администратор запретил сохранять данные в облако.' }, 403)
   const form = await request.formData()
   const file = form.get('file')
   if (!(file instanceof File) || !file.name.toLowerCase().endsWith('.json') || file.size < 1) return json({ error: 'Выберите JSON-файл архива' }, 400)

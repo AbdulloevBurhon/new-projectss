@@ -1,13 +1,21 @@
 import { reactive } from 'vue'
-import { deleteProduct, getProducts, saveProduct } from './products.service'
+import { deleteProduct, getLegacyProducts, getProducts, saveProduct, saveProducts } from './products.service'
 import type { GetProductsResult, ProductDraft } from './products.types'
 
 export function useProductsStore() {
   const state = reactive({ rows: [] as GetProductsResult, loading: true, pending: false, error: '' })
 
-  function load() {
+  async function load() {
     try {
-      state.rows = getProducts()
+      state.rows = await getProducts()
+      if (!state.rows.length && typeof window !== 'undefined') {
+        const legacy = getLegacyProducts()
+        if (legacy.length) {
+          await $fetch('/api/products/migrate', { method: 'POST', body: { products: legacy } })
+          state.rows = await getProducts()
+        }
+      }
+      if (typeof window !== 'undefined') saveProducts(state.rows)
       state.error = ''
     } catch {
       state.error = 'Не удалось загрузить товары.'
@@ -21,7 +29,9 @@ export function useProductsStore() {
     state.pending = true
     state.error = ''
     try {
-      state.rows = await saveProduct(draft, id)
+      const product = await saveProduct(draft, id, state.rows.find(row => row.id === id))
+      state.rows = id ? state.rows.map(row => row.id === product.id ? product : row) : [product, ...state.rows]
+      saveProducts(state.rows)
       return true
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось сохранить товар.'
@@ -36,7 +46,9 @@ export function useProductsStore() {
     state.pending = true
     state.error = ''
     try {
-      state.rows = await deleteProduct(id)
+      await deleteProduct(id)
+      state.rows = state.rows.filter(product => product.id !== id)
+      saveProducts(state.rows)
       return true
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Не удалось удалить товар.'

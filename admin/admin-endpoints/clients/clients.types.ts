@@ -5,6 +5,7 @@ export interface ClientRow {
   device: string
   licenseFrom: string
   licenseUntil: string
+  cloudArchiveAllowed: boolean
   active: boolean
   expired: boolean
   version: string

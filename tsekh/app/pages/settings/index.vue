@@ -13,6 +13,7 @@ const updateAvailable = ref<ClientUpdate | null>(null)
 const installingUpdate = ref(false)
 const desktop = ref(false)
 const cloudCopyEnabled = ref(false)
+const cloudArchiveAllowed = useState('tsekh-cloud-archive-allowed', () => true)
 const uploadingArchive = ref(false)
 const { localFolder, secondaryFolder, chooseFolder } = useArchiveFolders('tsekh')
 const { schedule, last, saveSchedule, downloadLast } = inject(scheduledArchiveKey)!
@@ -74,6 +75,8 @@ function setCloudCopy(enabled: boolean) {
   toast.success(enabled ? 'Облачная копия включена для следующего экспорта.' : 'Экспорт будет сохраняться только на устройстве.')
 }
 
+function denyCloudCopy() { toast.error('Администратор запретил сохранять данные в облако.') }
+
 onMounted(() => { desktop.value = !!desktopUpdates(); updateOnline(); cloudCopyEnabled.value = localStorage.getItem(cloudCopyKey) === 'true'; addEventListener('online', updateOnline); addEventListener('offline', updateOnline) })
 onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEventListener('offline', updateOnline) })
 </script>
@@ -86,6 +89,6 @@ onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEvent
       @choose-local="chooseFolder('local')"
       @choose-secondary="chooseFolder('secondary')"
     />
-    <BackupScheduleCard :schedule="schedule" :last-backup="lastBackup" @save="saveSchedule" @download-last="downloadLast" />
+    <BackupScheduleCard :schedule="schedule" :last-backup="lastBackup" :cloud-archive-allowed="cloudArchiveAllowed" @save="saveSchedule" @download-last="downloadLast" @cloud-copy-denied="denyCloudCopy" />
   </SettingsWorkspace>
 </template>

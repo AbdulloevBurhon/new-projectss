@@ -11,6 +11,7 @@ const { lock } = usePinAccess()
 const license = useCookie<string | null>('tsekh_license_active')
 const licenseUntil = useCookie<string | null>('tsekh_license_until')
 const access = useCookie<string | null>('tsekh_pin_access')
+const cloudArchiveAllowed = useState('tsekh-cloud-archive-allowed', () => true)
 const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
 provide(scheduledArchiveKey, useScheduledArchive('tsekh', apiBase, () =>
   license.value === '1' && access.value === '1' && route.path !== '/pin'
@@ -42,6 +43,7 @@ async function refreshLicense() {
   if (!license.value || !navigator.onLine) return
   try {
     const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId('tsekh')}`)
+    cloudArchiveAllowed.value = status.cloudArchiveAllowed == null ? true : Boolean(status.cloudArchiveAllowed)
     if (status.licenseStatus !== 'active' || status.productId !== 'tsekh') {
       license.value = null; licenseUntil.value = null; lock(); await router.push('/activation')
     } else if (status.licenseUntil) licenseUntil.value = status.licenseUntil

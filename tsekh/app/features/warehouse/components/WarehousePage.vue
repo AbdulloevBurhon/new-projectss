@@ -19,6 +19,7 @@ import { techCardsKey } from '../../../../endpoints/warehouse/techcards/techcard
 import { useTechCardsStore } from '../../../../endpoints/warehouse/techcards/techcards.store'
 import type { TechCard, TechCardDraft } from '../../../../endpoints/warehouse/techcards/techcards.types'
 import { accountsKey, getAccounts, type AccountRecord } from '../../../../endpoints/accounts/accounts.service'
+import { loadAccounts as fetchAccounts } from '../../../../endpoints/accounts/get-accounts/store'
 import TechCardFormDialog from './TechCardFormDialog.vue'
 import TechCardInfoDialog from './TechCardInfoDialog.vue'
 import DeleteTechCardDialog from './DeleteTechCardDialog.vue'
@@ -69,14 +70,6 @@ const visibleWarehouses = computed(() => state.rows.filter(warehouse => warehous
 const visibleTechCards = computed(() => techCards.state.rows.filter(card => card.name.toLocaleLowerCase('ru').includes(techCardSearch.value.trim().toLocaleLowerCase('ru'))))
 const visibleReceiptProducts = computed(() => products.state.rows.filter(product => product.name.toLocaleLowerCase('ru').includes(receiptSearch.value.trim().toLocaleLowerCase('ru'))))
 const receiptAccount = computed(() => accounts.value.find(account => account.id === receiptAccountId.value) ?? null)
-const receiptTotal = computed(() => products.state.rows.reduce((totalCents, product) => {
-  const line = receiptDrafts[product.id]
-  const quantity = Number(line?.quantity)
-  const unitPrice = Number(line?.unitPrice)
-  if (!line?.quantity || !line.unitPrice || !Number.isFinite(quantity) || !Number.isFinite(unitPrice) || quantity <= 0 || unitPrice < 0) return totalCents
-  return totalCents + Math.round(quantity * unitPrice * 100)
-}, 0) / 100)
-const receiptBalanceAfter = computed(() => Math.round(((receiptAccount.value?.amount ?? 0) - receiptTotal.value) * 100) / 100)
 watch(() => products.state.rows.map(product => product.id), (ids) => {
   for (const id of ids) {
     if (!receiptDrafts[id]) receiptDrafts[id] = { quantity: '', unitPrice: '' }
@@ -230,10 +223,10 @@ async function confirmDelete() {
   toast.success('Склад удалён.')
 }
 
-onMounted(() => {
+onMounted(async () => {
   load()
   try {
-    accounts.value = getAccounts()
+    accounts.value = await fetchAccounts()
   } catch {
     toast.error('Не удалось загрузить счета из хранилища.')
   }
@@ -359,15 +352,10 @@ onBeforeUnmount(() => window.removeEventListener('storage', handleStorage))
 
       <TabsContent value="receipts" class="space-y-4">
         <div class="flex flex-wrap items-end gap-3">
-          <Input v-model="receiptSearch" class="max-w-xs" type="search" placeholder="Поиск товара" aria-label="Поиск товара" />
+          <Input v-model="receiptSearch" class="w-full max-w-xs" type="search" placeholder="Поиск товара" aria-label="Поиск товара" />
           <label class="grid gap-1 text-sm">Склад<select v-model="receiptWarehouseId" class="h-10 min-w-44 rounded-md border bg-background px-3" :disabled="state.loading || !!state.error || !state.rows.length"><option value="" disabled>{{ state.loading ? 'Загрузка складов…' : state.rows.length ? 'Выберите склад' : 'Создайте склад во вкладке «Склады»' }}</option><option v-for="warehouse in state.rows" :key="warehouse.id" :value="warehouse.id">{{ warehouse.name }}</option></select></label>
           <label class="grid gap-1 text-sm"><span class="flex items-center justify-between gap-3">Счёт<span v-if="receiptAccount" class="text-xs text-muted-foreground">{{ money(receiptAccount.amount) }} сом</span></span><select v-model="receiptAccountId" class="h-10 min-w-44 rounded-md border bg-background px-3" :disabled="!accounts.length"><option value="" disabled>{{ accounts.length ? 'Выберите счёт' : 'Создайте счёт во вкладке «Счёт»' }}</option><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
-        </div>
-        <div v-if="receiptAccount" class="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border bg-background px-4 py-3 text-sm" aria-live="polite">
-          <span>Итого по заполненным строкам: <strong>{{ money(receiptTotal) }} сом</strong></span>
-          <span>Баланс счёта: <strong>{{ money(receiptAccount.amount) }} сом</strong></span>
-          <span v-if="receiptBalanceAfter >= 0" class="text-emerald-700">Остаток после поступления: <strong>{{ money(receiptBalanceAfter) }} сом</strong></span>
-          <span v-else class="text-destructive">Не хватает: <strong>{{ money(-receiptBalanceAfter) }} сом</strong></span>
+          <Button type="button" class="ml-auto"><Plus class="size-4" />Приход массово</Button>
         </div>
         <p v-if="products.state.loading" class="text-sm text-muted-foreground" role="status">Загрузка товаров…</p>
         <p v-else-if="products.state.error" class="text-sm text-destructive" role="alert">{{ products.state.error }}</p>

@@ -1,17 +1,39 @@
 <script setup lang="ts">
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Info, Pencil, Plus, Trash2, Wallet } from '@lucide/vue'
-import { computed, onMounted, ref } from 'vue'
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button, DataTable, Input, Tabs, TabsContent, TabsList, TabsTrigger, toast } from '@obshaya/ui'
+import { computed, onMounted, ref, watch } from 'vue'
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button, DataTable, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Tabs, TabsContent, TabsList, TabsTrigger, toast } from '@obshaya/ui'
 import AccountFormDialog from './AccountFormDialog.vue'
 import AccountMovementFormDialog from './AccountMovementFormDialog.vue'
-import { getAccounts, saveAccounts, type AccountRecord } from '../../../../endpoints/accounts/accounts.service'
+import type { AccountRecord } from '../../../../endpoints/accounts/get-accounts/types'
+import { loadAccounts } from '../../../../endpoints/accounts/get-accounts/store'
+import { saveAccount as createAccountRecord } from '../../../../endpoints/accounts/create-account/store'
+import { saveAccountChanges } from '../../../../endpoints/accounts/update-account/store'
+import { removeAccount as deleteAccountRecord } from '../../../../endpoints/accounts/delete-account/store'
+import { loadReceipts } from '../../../../endpoints/accounts/get-receipts/store'
+import type { ReceiptRecord } from '../../../../endpoints/accounts/get-receipts/types'
+import { saveReceipt } from '../../../../endpoints/accounts/create-receipt/store'
+import { saveReceiptChanges } from '../../../../endpoints/accounts/update-receipt/store'
+import { removeReceipt } from '../../../../endpoints/accounts/delete-receipt/store'
+import { loadExpenses } from '../../../../endpoints/accounts/get-expenses/store'
+import type { ExpenseRecord } from '../../../../endpoints/accounts/get-expenses/types'
+import { saveExpense as createExpenseRecord } from '../../../../endpoints/accounts/create-expense/store'
+import { saveExpenseChanges } from '../../../../endpoints/accounts/update-expense/store'
+import { removeExpense as deleteExpenseRecord } from '../../../../endpoints/accounts/delete-expense/store'
+import { loadTransfers } from '../../../../endpoints/accounts/get-transfers/store'
+import type { TransferRecord } from '../../../../endpoints/accounts/get-transfers/types'
+import { saveTransfer as createTransferRecord } from '../../../../endpoints/accounts/create-transfer/store'
+import { saveTransferChanges } from '../../../../endpoints/accounts/update-transfer/store'
+import { removeTransfer as deleteTransferRecord } from '../../../../endpoints/accounts/delete-transfer/store'
 
 type MovementRow = { id: string; date: string; createdAt: string; accountId: string; accountName: string; amount: number; note: string }
-type TransferRow = { id: string; date: string; createdAt: string; sourceAccountId: string; sourceAccountName: string; targetAccountId: string; targetAccountName: string; amount: number; note: string }
+type TransferRow = TransferRecord
 
 const activeTab = ref('accounts')
 const accountSearch = ref('')
 const accountDialogOpen = ref(false)
+const editingAccount = ref<AccountRecord | null>(null)
+const viewingAccount = ref<AccountRecord | null>(null)
+const deletingAccount = ref<AccountRecord | null>(null)
 const incomeDialogOpen = ref(false)
 const expenseDialogOpen = ref(false)
 const transferDialogOpen = ref(false)
@@ -28,9 +50,9 @@ const expenseTo = ref('')
 const transferFrom = ref('')
 const transferTo = ref('')
 const accountRows = useState('accounts', () => [] as AccountRecord[])
-const incomeRows = ref<MovementRow[]>([])
-const expenseRows = ref<MovementRow[]>([])
-const transferRows = ref<TransferRow[]>([])
+const incomeRows = useState<ReceiptRecord[]>('account-receipts', () => [])
+const expenseRows = useState<ExpenseRecord[]>('account-expenses', () => [])
+const transferRows = useState<TransferRow[]>('account-transfers', () => [])
 const tabs = [
   { value: 'accounts', label: 'Счёт', icon: Wallet },
   { value: 'receipts', label: 'Поступление', icon: ArrowDownToLine },
@@ -63,11 +85,38 @@ const transferColumns = [
   { key: 'actions', label: 'Действия', align: 'right' as const, class: 'w-[10%]' },
 ]
 
-onMounted(() => {
+onMounted(async () => {
   try {
-    accountRows.value = getAccounts()
+    accountRows.value = await loadAccounts()
+    incomeRows.value = await loadReceipts()
+    expenseRows.value = await loadExpenses()
+    transferRows.value = await loadTransfers()
   } catch {
-    toast.error('Не удалось загрузить счета из хранилища.')
+    toast.error('Не удалось загрузить данные счёта из базы данных.')
+  }
+})
+
+watch([incomeFrom, incomeTo], async ([from, to]) => {
+  try {
+    incomeRows.value = await loadReceipts({ from: from || undefined, to: to || undefined })
+  } catch {
+    toast.error('Не удалось загрузить поступления.')
+  }
+})
+
+watch([expenseFrom, expenseTo], async ([from, to]) => {
+  try {
+    expenseRows.value = await loadExpenses({ from: from || undefined, to: to || undefined })
+  } catch {
+    toast.error('Не удалось загрузить списания.')
+  }
+})
+
+watch([transferFrom, transferTo], async ([from, to]) => {
+  try {
+    transferRows.value = await loadTransfers({ from: from || undefined, to: to || undefined })
+  } catch {
+    toast.error('Не удалось загрузить переводы.')
   }
 })
 
@@ -75,55 +124,76 @@ function money(amount: number) {
   return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
 }
 
-function saveAccount(draft: { name: string }) {
-  const next = [{ id: crypto.randomUUID(), amount: 0, ...draft }, ...accountRows.value]
+function requestError(error: unknown, fallback: string) {
+  const message = (error as { data?: { statusMessage?: string } })?.data?.statusMessage
+  return typeof message === 'string' ? message : fallback
+}
+
+async function saveAccount(draft: { name: string }) {
   try {
-    saveAccounts(next)
-    accountRows.value = next
+    if (editingAccount.value) {
+      await saveAccountChanges({ id: editingAccount.value.id, name: draft.name })
+    } else {
+      await createAccountRecord(draft)
+    }
   } catch {
     toast.error('Не удалось сохранить счёт.')
     return
   }
+  editingAccount.value = null
   accountDialogOpen.value = false
 }
 
-function saveIncome(draft: { date: string; accountId: string; amount: number; note: string }) {
-  const account = accountRows.value.find(row => row.id === draft.accountId)
-  if (!account) return
-  if (editingIncome.value) {
-    incomeRows.value = incomeRows.value.map(row => row.id === editingIncome.value!.id
-      ? { ...row, ...draft, accountName: account.name }
-      : row)
-  } else {
-    incomeRows.value.unshift({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), accountName: account.name, ...draft })
+async function confirmDeleteAccount() {
+  if (!deletingAccount.value) return
+  try {
+    await deleteAccountRecord({ id: deletingAccount.value.id })
+    deletingAccount.value = null
+  } catch {
+    toast.error('Не удалось удалить счёт.')
+  }
+}
+
+async function saveIncome(draft: { date: string; accountId: string; amount: number; note: string }) {
+  try {
+    if (editingIncome.value) {
+      await saveReceiptChanges({ id: editingIncome.value.id, ...draft })
+    } else {
+      await saveReceipt(draft)
+    }
+  } catch {
+    toast.error('Не удалось сохранить приход денег.')
+    return
   }
   editingIncome.value = null
   incomeDialogOpen.value = false
 }
 
-function saveExpense(draft: { date: string; accountId: string; amount: number; note: string }) {
-  const account = accountRows.value.find(row => row.id === draft.accountId)
-  if (!account) return
-  if (editingExpense.value) {
-    expenseRows.value = expenseRows.value.map(row => row.id === editingExpense.value!.id
-      ? { ...row, ...draft, accountName: account.name }
-      : row)
-  } else {
-    expenseRows.value.unshift({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), accountName: account.name, ...draft })
+async function saveExpense(draft: { date: string; accountId: string; amount: number; note: string }) {
+  try {
+    if (editingExpense.value) {
+      await saveExpenseChanges({ id: editingExpense.value.id, ...draft })
+    } else {
+      await createExpenseRecord(draft)
+    }
+  } catch (error) {
+    toast.error(requestError(error, 'Не удалось сохранить списание.'))
+    return
   }
   editingExpense.value = null
   expenseDialogOpen.value = false
 }
 
-function saveTransfer(draft: { date: string; sourceAccountId: string; targetAccountId: string; amount: number; note: string }) {
-  const source = accountRows.value.find(row => row.id === draft.sourceAccountId)
-  const target = accountRows.value.find(row => row.id === draft.targetAccountId)
-  if (!source || !target || source.id === target.id) return
-  const transfer = { ...draft, sourceAccountName: source.name, targetAccountName: target.name }
-  if (editingTransfer.value) {
-    transferRows.value = transferRows.value.map(row => row.id === editingTransfer.value!.id ? { ...row, ...transfer } : row)
-  } else {
-    transferRows.value.unshift({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), ...transfer })
+async function saveTransfer(draft: { date: string; sourceAccountId: string; targetAccountId: string; amount: number; note: string }) {
+  try {
+    if (editingTransfer.value) {
+      await saveTransferChanges({ id: editingTransfer.value.id, ...draft })
+    } else {
+      await createTransferRecord(draft)
+    }
+  } catch (error) {
+    toast.error(requestError(error, 'Не удалось сохранить перевод.'))
+    return
   }
   editingTransfer.value = null
   transferDialogOpen.value = false
@@ -149,22 +219,34 @@ function dateTime(row: Pick<MovementRow, 'date' | 'createdAt'>) {
   return Number.isNaN(timestamp.getTime()) ? row.date : `${new Date(`${row.date}T00:00:00`).toLocaleDateString('ru-RU')} ${timestamp.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-function removeIncome() {
+async function removeIncome() {
   if (!deletingIncome.value) return
-  incomeRows.value = incomeRows.value.filter(row => row.id !== deletingIncome.value!.id)
-  deletingIncome.value = null
+  try {
+    await removeReceipt({ id: deletingIncome.value.id })
+    deletingIncome.value = null
+  } catch {
+    toast.error('Не удалось удалить приход денег.')
+  }
 }
 
-function removeExpense() {
+async function removeExpense() {
   if (!deletingExpense.value) return
-  expenseRows.value = expenseRows.value.filter(row => row.id !== deletingExpense.value!.id)
-  deletingExpense.value = null
+  try {
+    await deleteExpenseRecord({ id: deletingExpense.value.id })
+    deletingExpense.value = null
+  } catch {
+    toast.error('Не удалось удалить списание.')
+  }
 }
 
-function removeTransfer() {
+async function removeTransfer() {
   if (!deletingTransfer.value) return
-  transferRows.value = transferRows.value.filter(row => row.id !== deletingTransfer.value!.id)
-  deletingTransfer.value = null
+  try {
+    await deleteTransferRecord({ id: deletingTransfer.value.id })
+    deletingTransfer.value = null
+  } catch (error) {
+    toast.error(requestError(error, 'Не удалось удалить перевод.'))
+  }
 }
 
 function updateDeleteDialog(open: boolean) {
@@ -190,15 +272,15 @@ function updateDeleteDialog(open: boolean) {
       <TabsContent value="accounts" class="space-y-4">
         <div class="flex flex-wrap items-center gap-3">
           <Input v-model="accountSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск счёта" />
-          <Button class="ml-auto" @click="accountDialogOpen = true"><Plus class="size-4" />Счёт</Button>
+          <Button class="ml-auto" @click="editingAccount = null; accountDialogOpen = true"><Plus class="size-4" />Счёт</Button>
         </div>
         <DataTable :columns="accountColumns" :rows="visibleAccounts" :empty-text="accountSearch.trim() ? 'Совпадений не найдено' : 'Счетов пока нет'">
           <template #cell-amount="{ row }">{{ money(row.amount) }} сом</template>
           <template #cell-actions="{ row }">
             <div class="flex justify-end gap-1">
-              <Button size="icon" variant="ghost" :aria-label="`Информация о счёте ${row.name}`"><Info class="size-4 text-sky-600" /></Button>
-              <Button size="icon" variant="ghost" :aria-label="`Редактировать счёт ${row.name}`"><Pencil class="size-4 text-blue-600" /></Button>
-              <Button size="icon" variant="ghost" :aria-label="`Удалить счёт ${row.name}`"><Trash2 class="size-4 text-destructive" /></Button>
+              <Button size="icon" variant="ghost" :aria-label="`Информация о счёте ${row.name}`" @click="viewingAccount = row"><Info class="size-4 text-sky-600" /></Button>
+              <Button size="icon" variant="ghost" :aria-label="`Редактировать счёт ${row.name}`" @click="editingAccount = row; accountDialogOpen = true"><Pencil class="size-4 text-blue-600" /></Button>
+              <Button size="icon" variant="ghost" :aria-label="`Удалить счёт ${row.name}`" @click="deletingAccount = row"><Trash2 class="size-4 text-destructive" /></Button>
             </div>
           </template>
         </DataTable>
@@ -261,7 +343,28 @@ function updateDeleteDialog(open: boolean) {
         </div>
       </TabsContent>
     </Tabs>
-    <AccountFormDialog v-model:open="accountDialogOpen" @save="saveAccount" />
+    <AccountFormDialog v-model:open="accountDialogOpen" :account="editingAccount" @save="saveAccount" />
+    <Dialog :open="!!viewingAccount" @update:open="open => { if (!open) viewingAccount = null }">
+      <DialogContent v-if="viewingAccount">
+        <DialogHeader>
+          <DialogTitle>{{ viewingAccount.name }}</DialogTitle>
+          <DialogDescription>Информация о счёте</DialogDescription>
+        </DialogHeader>
+        <p class="text-sm text-muted-foreground">Сумма: <strong class="text-foreground">{{ money(viewingAccount.amount) }} сом</strong></p>
+      </DialogContent>
+    </Dialog>
+    <AlertDialog :open="!!deletingAccount" @update:open="open => { if (!open) deletingAccount = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Удалить счёт?</AlertDialogTitle>
+          <AlertDialogDescription>Счёт «{{ deletingAccount?.name }}» будет удалён.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Отмена</AlertDialogCancel>
+          <Button variant="destructive" @click="confirmDeleteAccount">Удалить</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <AccountMovementFormDialog v-model:open="incomeDialogOpen" kind="income" :accounts="accountRows" :movement="editingIncome" @save="saveIncome" />
     <AccountMovementFormDialog v-model:open="expenseDialogOpen" kind="expense" :accounts="accountRows" :movement="editingExpense" @save="saveExpense" />
     <AccountMovementFormDialog v-model:open="transferDialogOpen" kind="transfer" :accounts="accountRows" :movement="editingTransfer" @save-transfer="saveTransfer" />
@@ -269,7 +372,7 @@ function updateDeleteDialog(open: boolean) {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Удалить приход?</AlertDialogTitle>
-          <AlertDialogDescription>Операция будет удалена из текущего списка.</AlertDialogDescription>
+          <AlertDialogDescription>Приход будет удалён, а сумма счёта пересчитана.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Отмена</AlertDialogCancel>
@@ -281,7 +384,7 @@ function updateDeleteDialog(open: boolean) {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Удалить списание?</AlertDialogTitle>
-          <AlertDialogDescription>Операция будет удалена из текущего списка.</AlertDialogDescription>
+          <AlertDialogDescription>Списание будет удалено, а сумма счёта возвращена.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Отмена</AlertDialogCancel>
@@ -293,7 +396,7 @@ function updateDeleteDialog(open: boolean) {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Удалить перевод?</AlertDialogTitle>
-          <AlertDialogDescription>Операция будет удалена из текущего списка.</AlertDialogDescription>
+          <AlertDialogDescription>Сумма вернётся на исходный счёт. Для отмены на целевом счёте должны быть средства.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Отмена</AlertDialogCancel>

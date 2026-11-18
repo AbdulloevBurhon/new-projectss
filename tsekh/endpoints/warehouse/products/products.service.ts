@@ -19,7 +19,7 @@ function isProduct(value: unknown): value is Product {
     && product.quantityPerPiece > 0
 }
 
-export function getProducts() {
+export function getLegacyProducts(): Product[] {
   const raw = localStorage.getItem(productsKey)
   if (raw === null) return []
   const rows: unknown = JSON.parse(raw)
@@ -43,36 +43,27 @@ export function validateProductDraft(draft: ProductDraft): Omit<Product, 'id'> {
   return { name, unit: draft.unit, contentUnit: draft.contentUnit, quantityPerPiece: quantity }
 }
 
-async function changeProducts(change: (rows: Product[]) => Product[]) {
-  const save = () => {
-    const rows = change(getProducts())
-    try {
-      localStorage.setItem(productsKey, JSON.stringify(rows))
-    } catch {
-      throw new Error('Не удалось сохранить товары в браузере.')
-    }
-    return rows
-  }
-  return navigator.locks ? navigator.locks.request(productsKey, save) : save()
+export function getProducts() {
+  return $fetch<Product[]>('/api/products')
 }
 
-export function saveProduct(draft: ProductDraft, id?: string) {
+export function saveProducts(rows: Product[]) {
+  const value = JSON.stringify(rows)
+  if (localStorage.getItem(productsKey) !== value) localStorage.setItem(productsKey, value)
+}
+
+export function saveProduct(draft: ProductDraft, id?: string, previous?: Product) {
   const fields = validateProductDraft(draft)
-  return changeProducts((rows) => {
-    const previous = id ? rows.find(product => product.id === id) : undefined
-    if (id && !previous) throw new Error('Товар уже удалён.')
-    const referenced = id ? getTechCards().some(card => card.materials.some(line => line.productId === id)) : false
-    if (referenced && previous && (previous.unit !== fields.unit || previous.contentUnit !== fields.contentUnit || previous.quantityPerPiece !== fields.quantityPerPiece)) {
-      throw new Error('Товар используется в техкарте. Сначала уберите его из состава, затем изменяйте единицы или упаковку.')
-    }
-    const product: Product = { id: id ?? crypto.randomUUID(), ...fields }
-    return id ? rows.map(row => row.id === id ? product : row) : [product, ...rows]
-  })
+  const referenced = id ? getTechCards().some(card => card.materials.some(line => line.productId === id)) : false
+  if (referenced && previous && (previous.unit !== fields.unit || previous.contentUnit !== fields.contentUnit || previous.quantityPerPiece !== fields.quantityPerPiece)) {
+    throw new Error('Товар используется в техкарте. Сначала уберите его из состава, затем изменяйте единицы или упаковку.')
+  }
+  return id
+    ? $fetch<Product>(`/api/products/${encodeURIComponent(id)}`, { method: 'PATCH', body: fields })
+    : $fetch<Product>('/api/products', { method: 'POST', body: fields })
 }
 
 export function deleteProduct(id: string) {
-  return changeProducts((rows) => {
-    if (getTechCards().some(card => card.materials.some(line => line.productId === id))) throw new Error('Товар используется в техкарте. Сначала уберите его из состава.')
-    return rows.filter(product => product.id !== id)
-  })
+  if (getTechCards().some(card => card.materials.some(line => line.productId === id))) throw new Error('Товар используется в техкарте. Сначала уберите его из состава.')
+  return $fetch<{ success: boolean }>(`/api/products/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }

@@ -3,12 +3,13 @@ import { ref, watch } from 'vue'
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label } from '@obshaya/ui'
 
 const open = defineModel<boolean>('open', { required: true })
+const props = defineProps<{ account?: { id: string; name: string } | null }>()
 const emit = defineEmits<{ save: [draft: { name: string }] }>()
 const name = ref('')
 
 watch(open, (isOpen) => {
   if (!isOpen) return
-  name.value = ''
+  name.value = props.account?.name ?? ''
 })
 
 function submit() {
@@ -22,7 +23,7 @@ function submit() {
   <Dialog v-model:open="open">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Добавить счёт</DialogTitle>
+        <DialogTitle>{{ props.account ? 'Изменить счёт' : 'Добавить счёт' }}</DialogTitle>
         <DialogDescription>Укажите название счёта.</DialogDescription>
       </DialogHeader>
       <form class="space-y-4" @submit.prevent="submit">
@@ -32,7 +33,7 @@ function submit() {
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">Отмена</Button>
-          <Button type="submit" :disabled="!name.trim()">Добавить счёт</Button>
+          <Button type="submit" :disabled="!name.trim()">{{ props.account ? 'Сохранить' : 'Добавить счёт' }}</Button>
         </DialogFooter>
       </form>
     </DialogContent>

@@ -11,6 +11,7 @@ const online = ref(false)
 const updateAvailable = ref<ClientUpdate | null>(null)
 const downloadingUpdate = ref(false)
 const cloudCopyEnabled = ref(false)
+const cloudArchiveAllowed = useState('shawarma-cloud-archive-allowed', () => true)
 const uploadingArchive = ref(false)
 const { localFolder, secondaryFolder, chooseFolder } = useArchiveFolders('shawarma')
 const { schedule, last, saveSchedule, downloadLast } = inject(scheduledArchiveKey)!
@@ -55,6 +56,8 @@ async function exportData() {
   finally { uploadingArchive.value = false }
 }
 
+function denyCloudCopy() { toast.error('Администратор запретил сохранять данные в облако.') }
+
 async function importData(file: File) {
   try { await restoreProductArchive(file, 'shawarma'); toast.success('Данные восстановлены. Перезагрузите страницу, чтобы обновить разделы.') }
   catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось импортировать архив.') }
@@ -82,8 +85,10 @@ onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEvent
       product-name="Шаурмичная"
       :schedule="schedule"
       :last-backup="lastBackup"
+      :cloud-archive-allowed="cloudArchiveAllowed"
       @save="saveSchedule"
       @download-last="downloadLast"
+      @cloud-copy-denied="denyCloudCopy"
     />
   </SettingsWorkspace>
 </template>
