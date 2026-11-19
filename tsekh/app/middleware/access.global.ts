@@ -3,17 +3,26 @@ import { clearClientPin, clientApi, installationId, isTemporaryPin, temporaryPin
 export default defineNuxtRouteMiddleware(async (to) => {
   const license = useCookie<string | null>('tsekh_license_active')
   const expires = useCookie<string | null>('tsekh_license_until')
+  const licenseNotice = useCookie<string | null>('tsekh_license_notice')
   const access = useCookie<string | null>('tsekh_pin_access')
+  if (to.path === '/pin' && to.query.notice === 'disabled') licenseNotice.value = 'disabled'
   if (license.value === '1' && expires.value && Date.parse(expires.value) <= Date.now()) {
     license.value = null; expires.value = null; access.value = null
   }
   if (import.meta.client && license.value === '1' && navigator.onLine) {
     try {
       const status = await clientApi<ActivationStatus>(useRuntimeConfig().public.licenseApiBase as string, `/api/client/activation/${installationId('tsekh')}`)
-      if (status.licenseStatus !== 'active' || status.productId !== 'tsekh') { license.value = null; expires.value = null; access.value = null }
-      else if (status.licenseUntil) expires.value = status.licenseUntil
+      if (status.licenseStatus !== 'active' || status.productId !== 'tsekh') {
+        const disabled = status.licenseStatus === 'disabled' && status.productId === 'tsekh'
+        license.value = null; expires.value = null; access.value = null
+        licenseNotice.value = disabled ? 'disabled' : null
+      } else {
+        licenseNotice.value = null
+        if (status.licenseUntil) expires.value = status.licenseUntil
+      }
     } catch { /* Keep cached access when temporarily offline. */ }
   }
+  if (licenseNotice.value === 'disabled') return to.path === '/pin' ? undefined : navigateTo('/pin?notice=disabled')
   if (to.path.startsWith('/activation')) return license.value === '1' ? navigateTo('/pin') : undefined
   if (license.value !== '1') return navigateTo('/activation')
   if (to.path === '/pin') return

@@ -8,7 +8,8 @@ import { handleUpdates } from './handlers/admin/updates'
 import { handleActivation } from './handlers/client/activation'
 import { uploadClientArchive } from './handlers/client/archives'
 import { changePin, verifyPin } from './handlers/client/access'
-import { handleClientMessages, handleClientSupport } from './handlers/client/messages'
+import { handleActivationSupport, handleClientMessages, handleClientSupport } from './handlers/client/messages'
+import { handleActivationMessages } from './handlers/admin/activation-messages'
 import { listClientUpdates } from './handlers/client/updates'
 import { requireAdmin } from './middleware/admin-auth'
 import { apiError, corsHeaders, json, notFound } from './utils/http'
@@ -24,6 +25,7 @@ export default {
       const unauthorized = requireAdmin(request, env)
       if (unauthorized) return unauthorized
       if (parts[2] === 'auth' && request.method === 'GET') return json({ ok: true })
+      if (parts[2] === 'activation-messages' && request.method === 'GET') return handleActivationMessages(request, env)
       if (parts[2] === 'requests') return handleRequests(request, env, parts[3])
       if (parts[2] === 'clients') {
         if (parts[4] === 'messages') return handleAdminMessages(request, env, parts[3])
@@ -41,6 +43,7 @@ export default {
       if (parts[2] === 'pin' && parts[3] === 'verify' && request.method === 'POST') return verifyPin(request, env)
       if (parts[2] === 'pin' && parts[3] === 'change' && request.method === 'POST') return changePin(request, env)
       if (parts[2] === 'support' && request.method === 'POST') return handleClientSupport(request, env)
+      if (parts[2] === 'activation-support' && request.method === 'POST') return handleActivationSupport(request, env)
       if (parts[2] === 'messages') return handleClientMessages(request, env)
       if (parts[2] === 'updates' && !parts[3] && request.method === 'GET') return listClientUpdates(request, env)
       if (parts[2] === 'updates' && parts[3] && parts[4] === 'download') return handleUpdates(request, env, parts[3], 'download', true)

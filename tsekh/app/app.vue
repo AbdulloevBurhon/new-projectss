@@ -10,6 +10,7 @@ const router = useRouter()
 const { lock } = usePinAccess()
 const license = useCookie<string | null>('tsekh_license_active')
 const licenseUntil = useCookie<string | null>('tsekh_license_until')
+const licenseNotice = useCookie<string | null>('tsekh_license_notice')
 const access = useCookie<string | null>('tsekh_pin_access')
 const cloudArchiveAllowed = useState('tsekh-cloud-archive-allowed', () => true)
 const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
@@ -45,8 +46,13 @@ async function refreshLicense() {
     const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId('tsekh')}`)
     cloudArchiveAllowed.value = status.cloudArchiveAllowed == null ? true : Boolean(status.cloudArchiveAllowed)
     if (status.licenseStatus !== 'active' || status.productId !== 'tsekh') {
-      license.value = null; licenseUntil.value = null; lock(); await router.push('/activation')
-    } else if (status.licenseUntil) licenseUntil.value = status.licenseUntil
+      const disabled = status.licenseStatus === 'disabled' && status.productId === 'tsekh'
+      license.value = null; licenseUntil.value = null; licenseNotice.value = disabled ? 'disabled' : null
+      lock(); await router.push(disabled ? '/pin?notice=disabled' : '/activation')
+    } else {
+      licenseNotice.value = null
+      if (status.licenseUntil) licenseUntil.value = status.licenseUntil
+    }
   } catch { /* Offline use remains available until the cached license expires. */ }
   if (license.value === '1' && access.value === '1') {
     await reportInstalledUpdate(apiBase, appVersion).catch(() => {})

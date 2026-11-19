@@ -8,6 +8,7 @@ const product = 'tsekh' as const
 const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
 const license = useCookie<string | null>('tsekh_license_active', { sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 * 5 })
 const licenseUntil = useCookie<string | null>('tsekh_license_until', { sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 * 10 })
+const licenseNotice = useCookie<string | null>('tsekh_license_notice')
 const phase = ref<'ready' | 'waiting' | 'approved' | 'rejected'>('ready')
 const initialPin = ref('')
 const submitting = ref(false)
@@ -26,6 +27,11 @@ async function refreshStatus() {
     lastError = ''
     if (status.productId !== product) throw new Error('Заявка относится к другому направлению.')
     initialPin.value = status.initialPin ?? ''
+    if (status.licenseStatus === 'disabled') {
+      license.value = null; licenseUntil.value = null; licenseNotice.value = 'disabled'
+      await navigateTo('/pin?notice=disabled')
+      return
+    }
     if (status.requestStatus === 'pending') phase.value = 'waiting'
     if (status.requestStatus === 'rejected') { phase.value = 'rejected'; clearInterval(timer); return }
     if (status.licenseStatus === 'active' && status.licenseUntil) {
@@ -34,7 +40,7 @@ async function refreshStatus() {
       return
     }
     if (status.licenseStatus === 'disabled' || status.licenseStatus === 'expired' || status.licenseStatus === 'removed') {
-      license.value = null; licenseUntil.value = null; phase.value = 'rejected'; clearInterval(timer)
+      license.value = null; licenseUntil.value = null; licenseNotice.value = null; phase.value = 'rejected'; clearInterval(timer)
     }
   } catch (cause) {
     const message = cause instanceof Error ? cause.message.toLowerCase() : ''
@@ -54,6 +60,10 @@ async function requestAccess() {
   finally { submitting.value = false }
 }
 
+async function sendSupport(message: string) {
+  await clientApi(apiBase, '/api/client/activation-support', { method: 'POST', body: JSON.stringify({ installationId: installationId(product), product, body: message }) })
+}
+
 async function continueToPin() {
   if (!initialPin.value) return
   try {
@@ -67,4 +77,4 @@ onMounted(async () => { await refreshStatus(); if (phase.value === 'waiting' || 
 onBeforeUnmount(() => clearInterval(timer))
 </script>
 
-<template><ActivationFlow brand-name="Цех" logo-text="Ц" :phase="phase" :submitting="submitting" :initial-pin="initialPin" @request="requestAccess" @continue="continueToPin" /></template>
+<template><ActivationFlow brand-name="Цех" logo-text="Ц" :phase="phase" :submitting="submitting" :initial-pin="initialPin" :submit-support="sendSupport" @request="requestAccess" @continue="continueToPin" /></template>

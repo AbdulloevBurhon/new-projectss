@@ -53,6 +53,10 @@ async function requestAccess() {
   finally { submitting.value = false }
 }
 
+async function sendSupport(message: string) {
+  await clientApi(apiBase, '/api/client/activation-support', { method: 'POST', body: JSON.stringify({ installationId: installationId(product), product, body: message }) })
+}
+
 async function continueToPin() {
   try {
     await clientApi(apiBase, `/api/client/activation/${installationId(product)}`, { method: 'POST' })
@@ -65,4 +69,4 @@ onMounted(async () => { await refreshStatus(); if (phase.value === 'waiting' || 
 onBeforeUnmount(() => clearInterval(timer))
 </script>
 
-<template><ActivationFlow brand-name="Простое производство" logo-text="П" :phase="phase" :submitting="submitting" :initial-pin="initialPin" @request="requestAccess" @continue="continueToPin" /></template>
+<template><ActivationFlow brand-name="Простое производство" logo-text="П" :phase="phase" :submitting="submitting" :initial-pin="initialPin" :submit-support="sendSupport" @request="requestAccess" @continue="continueToPin" /></template>

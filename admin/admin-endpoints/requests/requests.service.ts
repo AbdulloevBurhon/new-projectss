@@ -1,5 +1,5 @@
-import { productLabels as names, type AdminRequest } from '@obshaya/contracts'
-import type { RequestDecision, RequestRow } from './requests.types'
+import { productLabels as names, type AdminRequest, type ProductId } from '@obshaya/contracts'
+import type { ActivationSupportMessage, RequestDecision, RequestRow } from './requests.types'
 import { adminApi } from '../core/admin-api'
 
 export async function listRequests(): Promise<RequestRow[]> {
@@ -9,4 +9,9 @@ export async function listRequests(): Promise<RequestRow[]> {
 
 export function decideRequest(id: string, body: RequestDecision) {
   return adminApi<{ ok: boolean; initialPin?: string }>(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify(body) })
+}
+
+export function listActivationMessages() {
+  return adminApi<Omit<ActivationSupportMessage, 'direction'>[]>('/activation-messages')
+    .then(rows => rows.map(row => ({ ...row, direction: names[row.productId as ProductId] })))
 }

@@ -1,15 +1,37 @@
 <script setup lang="ts">
-import { Check, LoaderCircle, ShieldCheck } from '@lucide/vue'
+import { Check, LoaderCircle, MessageSquare, Send, ShieldCheck } from '@lucide/vue'
+import { ref } from 'vue'
+import { toast } from 'vue-sonner'
 import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Textarea } from '../ui/textarea'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   brandName: string
   logoText?: string
   phase?: 'ready' | 'waiting' | 'approved' | 'rejected'
   submitting?: boolean
   initialPin?: string
+  submitSupport?: (message: string) => Promise<void>
 }>(), { phase: 'ready', submitting: false, initialPin: '' })
 const emit = defineEmits<{ request: []; continue: [] }>()
+const supportOpen = ref(false)
+const supportMessage = ref('')
+const supportSubmitting = ref(false)
+
+async function sendSupport() {
+  const message = supportMessage.value.trim()
+  if (!message || !props.submitSupport || supportSubmitting.value) return
+  supportSubmitting.value = true
+  try {
+    await props.submitSupport(message)
+    supportMessage.value = ''
+    supportOpen.value = false
+    toast.success('Сообщение отправлено администратору.')
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Не удалось отправить сообщение.')
+  } finally { supportSubmitting.value = false }
+}
 </script>
 
 <template>
@@ -45,5 +67,14 @@ const emit = defineEmits<{ request: []; continue: [] }>()
         <Button class="mt-4 w-full bg-lime-400 text-slate-950 hover:bg-lime-500" :disabled="!initialPin" @click="emit('continue')">{{ initialPin ? 'Перейти ко входу' : 'Ожидание PIN-кода…' }}</Button>
       </template>
     </section>
+    <Button v-if="props.submitSupport" type="button" aria-label="Написать в поддержку" title="Написать в поддержку" class="fixed bottom-5 right-5 z-40 grid size-12 place-items-center rounded-full bg-lime-400 p-0 text-slate-950 shadow-md hover:bg-lime-500" @click="supportOpen = true"><MessageSquare :size="20" aria-hidden="true" /></Button>
+    <Dialog v-if="supportOpen" v-model:open="supportOpen">
+      <DialogContent>
+        <DialogHeader><DialogTitle>Сообщение в поддержку</DialogTitle><DialogDescription>Опишите вопрос для службы поддержки.</DialogDescription></DialogHeader>
+        <Textarea v-model="supportMessage" maxlength="1000" rows="5" placeholder="Напишите сообщение..." />
+        <p class="text-right text-xs text-muted-foreground">{{ supportMessage.length }}/1000</p>
+        <DialogFooter><Button type="button" variant="outline" @click="supportOpen = false">Закрыть</Button><Button type="button" :disabled="supportSubmitting || !supportMessage.trim()" @click="sendSupport"><Send :size="16" />{{ supportSubmitting ? 'Отправка…' : 'Отправить' }}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
   </main>
 </template>

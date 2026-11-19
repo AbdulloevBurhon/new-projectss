@@ -1,12 +1,38 @@
 <script setup lang="ts">
 import { PinAccess, toast } from '@obshaya/ui'
-import { ref } from 'vue'
-import { clientApi, installationId } from '@obshaya/contracts/client-api'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { clientApi, installationId, type ActivationStatus } from '@obshaya/contracts/client-api'
 import { usePinAccess } from '../composables/usePinAccess'
 
 const { error, verify } = usePinAccess()
 const busy = ref(false)
 const apiBase = useRuntimeConfig().public.licenseApiBase as string
+const license = useCookie<string | null>('tsekh_license_active')
+const licenseUntil = useCookie<string | null>('tsekh_license_until')
+const licenseNotice = useCookie<string | null>('tsekh_license_notice')
+let statusTimer: ReturnType<typeof setInterval> | undefined
+
+async function refreshDisabledStatus() {
+  if (licenseNotice.value !== 'disabled' || !navigator.onLine) return
+  try {
+    const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId('tsekh')}`)
+    if (status.licenseStatus === 'active' && status.productId === 'tsekh' && status.licenseUntil) {
+      license.value = '1'; licenseUntil.value = status.licenseUntil; licenseNotice.value = null
+      await navigateTo('/pin')
+    } else if (status.licenseStatus !== 'disabled') {
+      license.value = null; licenseUntil.value = null; licenseNotice.value = null
+      await navigateTo('/activation')
+    }
+  } catch { /* Keep the disabled notice while the API is unavailable. */ }
+}
+
+onMounted(() => {
+  if (licenseNotice.value === 'disabled') {
+    void refreshDisabledStatus()
+    statusTimer = setInterval(() => void refreshDisabledStatus(), 10000)
+  }
+})
+onBeforeUnmount(() => clearInterval(statusTimer))
 
 function clearError() { error.value = '' }
 
@@ -29,5 +55,5 @@ async function support(message: string) {
 </script>
 
 <template>
-  <PinAccess brand-name="Цех" logo-text="Ц" :error="error" @submit="submit" @support="support" @clear-error="clearError" />
+  <PinAccess brand-name="Цех" logo-text="Ц" :error="error" :notice="licenseNotice === 'disabled' ? 'Услуга не оплачена. Обратитесь в службу поддержки.' : ''" @submit="submit" @support="support" @clear-error="clearError" />
 </template>

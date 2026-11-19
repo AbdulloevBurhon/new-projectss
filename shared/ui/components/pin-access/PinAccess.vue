@@ -8,7 +8,7 @@ import { Textarea } from '../ui/textarea'
 import { toast } from 'vue-sonner'
 import { computed, ref, watch } from 'vue'
 
-const props = withDefaults(defineProps<{ brandName: string; logoText?: string; error?: string }>(), { error: '' })
+const props = withDefaults(defineProps<{ brandName: string; logoText?: string; error?: string; notice?: string }>(), { error: '', notice: '' })
 const emit = defineEmits<{ submit: [pin: string]; support: [message: string]; clearError: [] }>()
 const pin = ref('')
 const pinVisible = ref(false)
@@ -52,17 +52,18 @@ function sendSupport() {
       <div class="mt-6 space-y-2">
         <Label for="access-pin">PIN-код</Label>
         <div class="relative">
-          <Input id="access-pin" v-model="pinInput" :type="pinVisible ? 'text' : 'password'" inputmode="numeric" autocomplete="one-time-code" maxlength="5" placeholder="Пять цифр" autofocus class="pr-12" />
+          <Input id="access-pin" v-model="pinInput" :type="pinVisible ? 'text' : 'password'" inputmode="numeric" autocomplete="one-time-code" maxlength="5" placeholder="Пять цифр" autofocus class="pr-12" :disabled="!!notice || submitting" />
           <Button type="button" variant="ghost" size="icon" class="absolute right-1 top-1/2 -translate-y-1/2" :aria-label="pinVisible ? 'Скрыть PIN-код' : 'Показать PIN-код'" @click="pinVisible = !pinVisible"><EyeOff v-if="pinVisible" :size="18" /><Eye v-else :size="18" /></Button>
         </div>
       </div>
       <p v-if="error" class="mt-3 flex items-center gap-2 text-sm text-destructive" role="alert"><AlertCircle :size="16" />{{ error }}</p>
-      <Button type="submit" class="mt-4 w-full bg-lime-400 text-slate-950 hover:bg-lime-500" :disabled="submitting || pin.length !== 5">{{ submitting ? 'Проверка…' : 'Войти' }}</Button>
+      <Button type="submit" class="mt-4 w-full bg-lime-400 text-slate-950 hover:bg-lime-500" :disabled="!!notice || submitting || pin.length !== 5">{{ submitting ? 'Проверка…' : 'Войти' }}</Button>
+      <p v-if="notice" class="mt-3 text-center text-sm font-medium text-rose-700" role="status">{{ notice }}</p>
     </form>
     <Button type="button" aria-label="Написать в поддержку" title="Написать в поддержку" class="fixed bottom-5 right-5 grid size-12 place-items-center rounded-full bg-lime-400 p-0 text-slate-950 shadow-md hover:bg-lime-500" @click="supportOpen = true"><MessageSquare :size="20" aria-hidden="true" /></Button>
     <Dialog v-model:open="supportOpen">
       <DialogContent>
-        <DialogHeader><DialogTitle>Сообщение в поддержку</DialogTitle><DialogDescription>Опишите вопрос для службы поддержки.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>Сообщение в поддержку</DialogTitle><DialogDescription>Обратитесь в службу поддержки и опишите вопрос.</DialogDescription></DialogHeader>
         <Label for="support-message">Сообщение</Label>
         <Textarea id="support-message" v-model="supportMessage" maxlength="1000" rows="5" placeholder="Напишите сообщение..." />
         <p class="text-right text-xs text-muted-foreground">{{ supportMessage.length }}/1000</p>

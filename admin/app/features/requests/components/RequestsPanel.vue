@@ -3,7 +3,8 @@ import { Check, Copy, X } from '@lucide/vue'
 import { DataTable, Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, toast } from '@obshaya/ui'
 import { clients, requests } from '../../admin-state'
 import { listClients } from '../../../../admin-endpoints/clients/clients.service'
-import { decideRequest, listRequests } from '../../../../admin-endpoints/requests/requests.service'
+import { decideRequest, listActivationMessages, listRequests } from '../../../../admin-endpoints/requests/requests.service'
+import type { ActivationSupportMessage } from '../../../../admin-endpoints/requests/requests.types'
 import { onMounted, ref } from 'vue'
 
 const columns = [
@@ -15,10 +16,18 @@ const columns = [
 const busyId = ref('')
 const pinDialogOpen = ref(false)
 const approvedPin = ref('')
+const activationMessages = ref<ActivationSupportMessage[]>([])
+const activationMessageColumns = [
+  { key: 'direction', label: 'Направление' }, { key: 'installationId', label: 'Устройство' },
+  { key: 'body', label: 'Сообщение' }, { key: 'receivedAt', label: 'Получено' },
+]
 onMounted(() => { void refresh() })
 
 async function refresh() {
-  try { requests.value = await listRequests() } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось загрузить заявки') }
+  try {
+    const [requestRows, messageRows] = await Promise.all([listRequests(), listActivationMessages()])
+    requests.value = requestRows; activationMessages.value = messageRows
+  } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось загрузить заявки и сообщения') }
 }
 
 async function accept(item: (typeof requests.value)[number]) {
@@ -63,6 +72,13 @@ async function copyApprovedPin() {
       <template #cell-status><Badge class="rounded-full bg-amber-50 text-amber-700">Ожидает</Badge></template>
       <template #cell-actions="{ row }"><div class="flex justify-end gap-2"><Button size="icon" variant="outline" aria-label="Принять заявку" style="color: #15803d" @click="accept(row)"><Check class="size-4" /></Button><Button size="icon" variant="outline" aria-label="Отклонить заявку" style="color: #dc2626" @click="decline(row.id)"><X class="size-4" /></Button></div></template>
     </DataTable>
+    <div class="space-y-3">
+      <h3 class="text-sm font-medium">Сообщения с экрана активации</h3>
+      <DataTable :columns="activationMessageColumns" :rows="activationMessages" row-key="id" empty-text="Сообщений пока нет">
+        <template #cell-body="{ value }"><p class="max-w-xl whitespace-pre-wrap break-words">{{ value }}</p></template>
+        <template #cell-receivedAt="{ value }"><time class="whitespace-nowrap">{{ new Date(value).toLocaleString() }}</time></template>
+      </DataTable>
+    </div>
     <Dialog v-model:open="pinDialogOpen">
       <DialogContent class="sm:max-w-sm">
         <DialogHeader>
