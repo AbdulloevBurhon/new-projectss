@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { deleteWarehouse } from './delete-warehouse.service'
 import type { DeleteWarehouseInput } from './delete-warehouse.types'
+import { stockReceiptError } from '../stock-receipts/service'
 
 export function useDeleteWarehouseStore() {
   const pending = ref(false)
@@ -13,8 +14,8 @@ export function useDeleteWarehouseStore() {
     try {
       await deleteWarehouse(input)
       return true
-    } catch {
-      error.value = 'Не удалось удалить склад.'
+    } catch (cause) {
+      error.value = stockReceiptError(cause, 'Не удалось удалить склад.')
       return false
     } finally {
       pending.value = false

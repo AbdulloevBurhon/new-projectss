@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Archive, ArrowLeftRight, Boxes, Inbox, Info, NotebookPen, Pencil, Plus, RefreshCw, RotateCcw, SlidersHorizontal, Trash2, Warehouse as WarehouseIcon } from '@lucide/vue'
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { Archive, ArrowLeftRight, Boxes, Inbox, Info, NotebookPen, Pencil, Plus, RefreshCw, SlidersHorizontal, Trash2, Warehouse as WarehouseIcon } from '@lucide/vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Button, DataTable, Input, Tabs, TabsContent, TabsList, TabsTrigger, toast } from '@obshaya/ui'
 import { warehousesKey } from '../../../../endpoints/warehouse/get-warehouses/get-warehouses.service'
 import { useGetWarehousesStore } from '../../../../endpoints/warehouse/get-warehouses/get-warehouses.store'
@@ -23,6 +23,7 @@ import { loadAccounts as fetchAccounts } from '../../../../endpoints/accounts/ge
 import TechCardFormDialog from './TechCardFormDialog.vue'
 import TechCardInfoDialog from './TechCardInfoDialog.vue'
 import DeleteTechCardDialog from './DeleteTechCardDialog.vue'
+import { useStockReceipts } from '../composables/useStockReceipts'
 
 const { state, load } = useGetWarehousesStore()
 const create = useCreateWarehouseStore()
@@ -33,6 +34,8 @@ const techCards = useTechCardsStore()
 const receiptWarehouseId = ref('')
 const receiptAccountId = ref('')
 const accounts = useState('accounts', () => [] as AccountRecord[])
+const nuxt = useNuxtApp()
+const refreshAccounts = () => nuxt.runWithContext(fetchAccounts)
 const dialogOpen = ref(false)
 const editing = ref<Warehouse | null>(null)
 const deleting = ref<Warehouse | null>(null)
@@ -45,8 +48,15 @@ const productSearch = ref('')
 const warehouseSearch = ref('')
 const techCardSearch = ref('')
 const receiptSearch = ref('')
-const receiptDrafts = reactive<Record<string, { quantity: string; unitPrice: string }>>({})
-const receiptSelected = reactive<Record<string, boolean>>({})
+const {
+  posted, latest, lines: receiptDrafts, errors: receiptErrors, busy: receiptBusy, loadError: receiptLoadError,
+  seconds: receiptSeconds, edit: updateReceiptDraft, toggle: toggleReceipt, salePriceFor, selectionLocked,
+} = useStockReceipts(receiptWarehouseId, receiptAccountId, () => products.state.rows, refreshAccounts)
+const balanceWarehouseId = ref('')
+const balanceSearch = ref('')
+const historyWarehouseId = ref('')
+const historyFrom = ref('')
+const historyTo = ref('')
 const techCardDialogOpen = ref(false)
 const selectedTechCard = ref<TechCard | null>(null)
 const infoTechCard = ref<TechCard | null>(null)
@@ -70,20 +80,51 @@ const visibleWarehouses = computed(() => state.rows.filter(warehouse => warehous
 const visibleTechCards = computed(() => techCards.state.rows.filter(card => card.name.toLocaleLowerCase('ru').includes(techCardSearch.value.trim().toLocaleLowerCase('ru'))))
 const visibleReceiptProducts = computed(() => products.state.rows.filter(product => product.name.toLocaleLowerCase('ru').includes(receiptSearch.value.trim().toLocaleLowerCase('ru'))))
 const receiptAccount = computed(() => accounts.value.find(account => account.id === receiptAccountId.value) ?? null)
-watch(() => products.state.rows.map(product => product.id), (ids) => {
-  for (const id of ids) {
-    if (!receiptDrafts[id]) receiptDrafts[id] = { quantity: '', unitPrice: '' }
-    if (receiptSelected[id] === undefined) receiptSelected[id] = false
+const numberFormat = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 6 })
+const operationDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'medium' })
+const warehouseNames = computed(() => {
+  const names = new Map(state.rows.map(row => [row.id, row.name]))
+  for (const row of posted.value) {
+    if (!names.has(row.warehouseId)) names.set(row.warehouseId, row.warehouseName)
   }
-  for (const id of Object.keys(receiptDrafts)) if (!ids.includes(id)) delete receiptDrafts[id]
-  for (const id of Object.keys(receiptSelected)) if (!ids.includes(id)) delete receiptSelected[id]
-}, { immediate: true })
-const emptyRows: { id: string }[] = []
+  return names
+})
+const listedWarehouses = computed(() => [...warehouseNames.value].map(([id, name]) => ({ id, name })))
+const historyRows = computed(() => posted.value.filter(row => {
+  const date = new Date(row.postedAt!)
+  const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return (!historyWarehouseId.value || row.warehouseId === historyWarehouseId.value)
+    && (!historyFrom.value || day >= historyFrom.value)
+    && (!historyTo.value || day <= historyTo.value)
+}))
+const historyTotal = computed(() => historyRows.value.reduce((total, row) => total + (row.total ?? 0), 0))
+const balanceRows = computed(() => {
+  const totals = new Map<string, { id: string; product: string; warehouse: string; unit: string; stock: number; contentStock: number; contentUnit: string | null }>()
+  for (const row of posted.value) {
+    if (balanceWarehouseId.value && row.warehouseId !== balanceWarehouseId.value) continue
+    const id = JSON.stringify([row.warehouseId, row.productId, row.unit, row.contentUnit])
+    let total = totals.get(id)
+    if (!total) {
+      const product = products.state.rows.find(product => product.id === row.productId)
+      total = {
+        id, product: product?.name ?? row.productName, warehouse: warehouseNames.value.get(row.warehouseId) ?? row.warehouseName,
+        unit: row.unit, stock: 0, contentStock: 0, contentUnit: row.contentUnit,
+      }
+      totals.set(id, total)
+    }
+    total.stock += row.quantity ?? 0
+    total.contentStock += (row.quantity ?? 0) * (row.quantityPerPiece ?? 0)
+  }
+  const search = balanceSearch.value.trim().toLocaleLowerCase('ru')
+  return [...totals.values()].filter(row => row.product.toLocaleLowerCase('ru').includes(search))
+})
 const balanceColumns = [
   { key: 'product', label: 'Товар' },
-  { key: 'unit', label: 'Ед. изм.' },
+  { key: 'warehouse', label: 'Склад' },
   { key: 'stock', label: 'Остаток', align: 'right' as const },
   { key: 'contentStock', label: 'Остаток содержимого', align: 'right' as const },
+  { key: 'opened', label: 'Открыто', align: 'right' as const },
+  { key: 'openedRemaining', label: 'Остаток из открытого', align: 'right' as const },
 ]
 const historyColumns = [
   { key: 'operation', label: 'Операция, дата и время' },
@@ -91,6 +132,7 @@ const historyColumns = [
   { key: 'warehouse', label: 'Склад' },
   { key: 'worker', label: 'Рабочий' },
   { key: 'quantity', label: 'Количество', align: 'right' as const },
+  { key: 'opened', label: 'Открыто', align: 'right' as const },
   { key: 'sum', label: 'Сумма', align: 'right' as const },
 ]
 const productColumns = [
@@ -106,9 +148,11 @@ const techCardColumns = [
 ]
 const receiptColumns = [
   { key: 'product', label: 'Товар' },
-  { key: 'quantity', label: 'Количество' },
-  { key: 'unitPrice', label: 'Цена за единицу' },
-  { key: 'sum', label: 'Сумма', align: 'right' as const },
+  { key: 'quantity', label: 'Количество', class: 'w-32' },
+  { key: 'unitPrice', label: 'Цена закупки', class: 'w-52' },
+  { key: 'salePrice', label: 'Цена продажи', class: 'w-52' },
+  { key: 'sum', label: 'Сумма закупки', align: 'right' as const },
+  { key: 'revenue', label: 'Ожидаемая выручка', align: 'right' as const },
   { key: 'actions', label: 'Действия', align: 'right' as const },
 ]
 const formStore = computed(() => editing.value ? update : create)
@@ -149,19 +193,32 @@ function handleStorage(event: StorageEvent) {
 }
 
 function money(value: number) { return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) }
-function updateReceiptDraft(id: string, field: 'quantity' | 'unitPrice', value: string) {
+function receiptTotal(id: string) {
   const line = receiptDrafts[id]
-  if (line) line[field] = value
-}
-function receiptSum(id: string) {
-  const line = receiptDrafts[id]
-  if (!line?.quantity || !line.unitPrice) return '—'
+  if (!line?.quantity || !line.unitPrice) return null
   const sum = Number(line.quantity) * Number(line.unitPrice)
-  return Number.isFinite(sum) ? `${money(sum)} сом` : '—'
+  return Number.isFinite(sum) && sum >= 0 ? Math.round((sum + Number.EPSILON) * 100) / 100 : null
 }
-function resetReceiptLine(id: string) {
-  if (receiptDrafts[id]) receiptDrafts[id] = { quantity: '', unitPrice: '' }
-  receiptSelected[id] = false
+function receiptProduct(product: Product) {
+  const receipt = latest.value[product.id]
+  return receipt?.status === 'pending' ? receipt : product
+}
+function expectedRevenue(product: Product) {
+  const quantity = Number(receiptDrafts[product.id]?.quantity)
+  const price = salePriceFor(product)
+  const pack = receiptProduct(product)
+  const total = quantity * (pack.quantityPerPiece ?? 1) * Number(price)
+  return price.trim() && quantity > 0 && Number(price) >= 0 && Number(price) <= 1_000_000 && Number.isFinite(total)
+    ? `${money(total)} сом` : '—'
+}
+function receiptFeedback(id: string) {
+  if (receiptErrors[id]) return receiptErrors[id]
+  const row = latest.value[id]
+  if (row?.status === 'failed') return row.error
+  const account = accounts.value.find(account => account.id === row?.accountId)
+  const total = receiptTotal(id)
+  return row?.status === 'pending' && account && total !== null && Math.round(account.amount * 100) < Math.round(total * 100)
+    ? 'Недостаточно средств на счёте.' : ''
 }
 function openTechCardForm(card: TechCard | null = null) {
   selectedTechCard.value = card
@@ -226,7 +283,7 @@ async function confirmDelete() {
 onMounted(async () => {
   load()
   try {
-    accounts.value = await fetchAccounts()
+    await refreshAccounts()
   } catch {
     toast.error('Не удалось загрузить счета из хранилища.')
   }
@@ -284,34 +341,48 @@ onBeforeUnmount(() => window.removeEventListener('storage', handleStorage))
 
       <TabsContent value="balance" class="space-y-4">
         <div class="flex flex-wrap items-center gap-3">
-          <select aria-label="Склад" class="h-10 min-w-48 rounded-md border bg-background px-3 text-sm"><option>Все склады</option></select>
-          <Input v-model="productSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
+          <select v-model="balanceWarehouseId" aria-label="Склад" class="h-10 min-w-48 rounded-md border bg-background px-3 text-sm"><option value="">Все склады</option><option v-for="warehouse in listedWarehouses" :key="warehouse.id" :value="warehouse.id">{{ warehouse.name }}</option></select>
+          <Input v-model="balanceSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
           <div class="ml-auto flex flex-wrap gap-2">
             <Button type="button" variant="outline"><ArrowLeftRight class="size-4" />Перемещение</Button>
             <Button type="button" variant="outline"><SlidersHorizontal class="size-4" />Корректировка</Button>
           </div>
         </div>
-        <DataTable :columns="balanceColumns" :rows="emptyRows" empty-text="Остатков пока нет" />
+        <p v-if="receiptLoadError" class="text-sm text-destructive" role="alert">{{ receiptLoadError }}</p>
+        <DataTable :columns="balanceColumns" :rows="balanceRows" empty-text="Остатков пока нет">
+          <template #cell-stock="{ row }">{{ numberFormat.format(row.stock) }} {{ row.unit }}</template>
+          <template #cell-contentStock="{ row }">{{ row.contentUnit ? `${numberFormat.format(row.contentStock)} ${row.contentUnit}` : '—' }}</template>
+          <template #cell-opened="{ row }">{{ row.contentUnit || row.unit === 'уп' ? `0 ${row.unit}` : '—' }}</template>
+          <template #cell-openedRemaining="{ row }">{{ row.contentUnit ? `0 ${row.contentUnit}` : '—' }}</template>
+        </DataTable>
       </TabsContent>
 
       <TabsContent value="history" class="space-y-4">
         <div class="grid gap-3 sm:grid-cols-3">
-          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Поступления</p><p class="mt-1 text-xl font-semibold">—</p></div>
+          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Поступления</p><p class="mt-1 text-xl font-semibold">{{ historyRows.length }}</p></div>
           <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Расходы</p><p class="mt-1 text-xl font-semibold">—</p></div>
-          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Сумма поступлений</p><p class="mt-1 text-xl font-semibold">—</p></div>
+          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Сумма поступлений</p><p class="mt-1 text-xl font-semibold">{{ money(historyTotal) }} сом</p></div>
         </div>
         <div class="flex flex-wrap items-end gap-3">
-          <label class="grid gap-1 text-sm">Склад<select class="h-10 min-w-44 rounded-md border bg-background px-3"><option>Все склады</option></select></label>
-          <label class="grid gap-1 text-sm">С даты<Input type="date" /></label>
-          <label class="grid gap-1 text-sm">По дату<Input type="date" /></label>
-          <Button variant="outline">Сбросить</Button>
+          <label class="grid gap-1 text-sm">Склад<select v-model="historyWarehouseId" class="h-10 min-w-44 rounded-md border bg-background px-3"><option value="">Все склады</option><option v-for="warehouse in listedWarehouses" :key="warehouse.id" :value="warehouse.id">{{ warehouse.name }}</option></select></label>
+          <label class="grid gap-1 text-sm">С даты<Input v-model="historyFrom" type="date" /></label>
+          <label class="grid gap-1 text-sm">По дату<Input v-model="historyTo" type="date" /></label>
+          <Button variant="outline" @click="historyWarehouseId = ''; historyFrom = ''; historyTo = ''">Сбросить</Button>
         </div>
-        <DataTable :columns="historyColumns" :rows="emptyRows" empty-text="Операций пока нет" />
+        <p v-if="receiptLoadError" class="text-sm text-destructive" role="alert">{{ receiptLoadError }}</p>
+        <DataTable :columns="historyColumns" :rows="historyRows" empty-text="Операций пока нет">
+          <template #cell-operation="{ row }">Приход <small class="block text-muted-foreground">{{ operationDate.format(row.postedAt) }}</small></template>
+          <template #cell-product="{ row }">{{ row.productName }}</template>
+          <template #cell-warehouse="{ row }">{{ row.warehouseName }}</template>
+          <template #cell-quantity="{ row }">{{ numberFormat.format(row.quantity) }} {{ row.unit }}</template>
+          <template #cell-opened="{ row }">{{ row.unit === 'уп' || row.contentUnit ? '0' : '—' }}</template>
+          <template #cell-sum="{ row }">{{ money(row.total) }} сом</template>
+        </DataTable>
       </TabsContent>
 
       <TabsContent value="products" class="space-y-4">
         <div class="flex flex-wrap items-center gap-3">
-          <Input class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
+          <Input v-model="productSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
           <Button class="ml-auto" :disabled="products.state.loading || !!products.state.error" @click="openProductForm()"><Plus class="size-4" />Товар</Button>
         </div>
         <p v-if="products.state.loading" class="text-sm text-muted-foreground" role="status">Загрузка товаров…</p>
@@ -353,24 +424,37 @@ onBeforeUnmount(() => window.removeEventListener('storage', handleStorage))
       <TabsContent value="receipts" class="space-y-4">
         <div class="flex flex-wrap items-end gap-3">
           <Input v-model="receiptSearch" class="w-full max-w-xs" type="search" placeholder="Поиск товара" aria-label="Поиск товара" />
-          <label class="grid gap-1 text-sm">Склад<select v-model="receiptWarehouseId" class="h-10 min-w-44 rounded-md border bg-background px-3" :disabled="state.loading || !!state.error || !state.rows.length"><option value="" disabled>{{ state.loading ? 'Загрузка складов…' : state.rows.length ? 'Выберите склад' : 'Создайте склад во вкладке «Склады»' }}</option><option v-for="warehouse in state.rows" :key="warehouse.id" :value="warehouse.id">{{ warehouse.name }}</option></select></label>
-          <label class="grid gap-1 text-sm"><span class="flex items-center justify-between gap-3">Счёт<span v-if="receiptAccount" class="text-xs text-muted-foreground">{{ money(receiptAccount.amount) }} сом</span></span><select v-model="receiptAccountId" class="h-10 min-w-44 rounded-md border bg-background px-3" :disabled="!accounts.length"><option value="" disabled>{{ accounts.length ? 'Выберите счёт' : 'Создайте счёт во вкладке «Счёт»' }}</option><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
-          <Button type="button" class="ml-auto"><Plus class="size-4" />Приход массово</Button>
+          <label class="grid gap-1 text-sm">Склад<select v-model="receiptWarehouseId" aria-label="Склад поступления" class="h-10 min-w-44 rounded-md border bg-background px-3 disabled:opacity-60" :disabled="selectionLocked || state.loading || !!state.error || !state.rows.length"><option value="" disabled>{{ state.loading ? 'Загрузка складов…' : state.rows.length ? 'Выберите склад' : 'Создайте склад во вкладке «Склады»' }}</option><option v-for="warehouse in state.rows" :key="warehouse.id" :value="warehouse.id">{{ warehouse.name }}</option></select></label>
+          <label class="grid gap-1 text-sm"><span class="flex items-center justify-between gap-3">Счёт<span v-if="receiptAccount" class="text-xs text-muted-foreground">{{ money(receiptAccount.amount) }} сом</span></span><select v-model="receiptAccountId" aria-label="Счёт поступления" class="h-10 min-w-44 rounded-md border bg-background px-3 disabled:opacity-60" :disabled="selectionLocked || !accounts.length"><option value="" disabled>{{ accounts.length ? 'Выберите счёт' : 'Создайте счёт во вкладке «Счёт»' }}</option><option v-for="account in accounts" :key="account.id" :value="account.id">{{ account.name }}</option></select></label>
         </div>
+        <p v-if="receiptLoadError" class="text-sm text-destructive" role="alert">{{ receiptLoadError }}</p>
         <p v-if="products.state.loading" class="text-sm text-muted-foreground" role="status">Загрузка товаров…</p>
         <p v-else-if="products.state.error" class="text-sm text-destructive" role="alert">{{ products.state.error }}</p>
         <DataTable v-else :columns="receiptColumns" :rows="visibleReceiptProducts" :empty-text="receiptSearch.trim() ? 'Совпадений не найдено' : 'Сначала добавьте товары'">
           <template #cell-product="{ row }">
             <span>{{ row.name }}</span>
             <small class="block text-muted-foreground">{{ row.unit }}<template v-if="row.quantityPerPiece"> · {{ row.quantityPerPiece }} {{ row.contentUnit }} в 1 {{ row.unit }}</template></small>
+            <p v-if="receiptFeedback(row.id)" class="mt-1 whitespace-normal text-xs text-destructive" role="alert">{{ receiptFeedback(row.id) }}</p>
           </template>
-          <template #cell-quantity="{ row }"><Input type="number" min="0.001" step="0.001" placeholder="0" :model-value="receiptDrafts[row.id]?.quantity ?? ''" :aria-label="`Количество ${row.name}`" @update:model-value="updateReceiptDraft(row.id, 'quantity', String($event))" /></template>
-          <template #cell-unitPrice="{ row }"><Input type="number" min="0" step="0.01" placeholder="0,00" :model-value="receiptDrafts[row.id]?.unitPrice ?? ''" :aria-label="`Цена за единицу ${row.name}`" @update:model-value="updateReceiptDraft(row.id, 'unitPrice', String($event))" /></template>
-          <template #cell-sum="{ row }">{{ receiptSum(row.id) }}</template>
+          <template #cell-quantity="{ row }"><Input type="number" min="0.001" step="0.001" placeholder="0" :disabled="receiptBusy[row.id] || receiptSeconds(row.id) === 0" :model-value="receiptDrafts[row.id]?.quantity ?? ''" :aria-label="`Количество ${row.name}`" @update:model-value="updateReceiptDraft(row.id, 'quantity', String($event))" /></template>
+          <template #cell-unitPrice="{ row }">
+            <div class="flex min-w-32 items-center gap-2">
+              <Input type="number" min="0" step="0.01" placeholder="0,00" :disabled="receiptBusy[row.id] || receiptSeconds(row.id) === 0" :model-value="receiptDrafts[row.id]?.unitPrice ?? ''" :aria-label="`Цена закупки ${row.name} за ${receiptProduct(row).unit}`" @update:model-value="updateReceiptDraft(row.id, 'unitPrice', String($event))" />
+              <span class="text-xs text-muted-foreground">сом/{{ receiptProduct(row).unit }}</span>
+            </div>
+          </template>
+          <template #cell-salePrice="{ row }">
+            <div class="flex min-w-32 items-center gap-2">
+              <Input type="number" min="0" max="1000000" step="0.01" placeholder="—" :disabled="receiptBusy[row.id] || receiptSeconds(row.id) === 0" :model-value="salePriceFor(row)" :aria-label="`Цена продажи ${row.name} за ${receiptProduct(row).contentUnit ?? receiptProduct(row).unit}`" @update:model-value="updateReceiptDraft(row.id, 'salePrice', String($event))" />
+              <span class="text-xs text-muted-foreground">сом/{{ receiptProduct(row).contentUnit ?? receiptProduct(row).unit }}</span>
+            </div>
+          </template>
+          <template #cell-sum="{ row }">{{ receiptTotal(row.id) === null ? '—' : `${money(receiptTotal(row.id)!)} сом` }}</template>
+          <template #cell-revenue="{ row }">{{ expectedRevenue(row) }}</template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-end gap-2">
-              <input v-model="receiptSelected[row.id]" type="checkbox" class="size-4 accent-primary" :aria-label="`Выбрать товар ${row.name}`">
-              <Button size="icon" variant="outline" class="rounded-full" :aria-label="`Сбросить строку ${row.name}`" @click="resetReceiptLine(row.id)"><RotateCcw class="size-4" /></Button>
+              <input type="checkbox" class="size-4 accent-primary" :checked="latest[row.id]?.status === 'pending'" :disabled="receiptBusy[row.id] || receiptSeconds(row.id) === 0" :aria-label="`Поступление: ${row.name}`" @click.prevent="toggleReceipt(row.id, latest[row.id]?.status !== 'pending')">
+              <span class="flex size-9 items-center justify-center rounded-full border text-xs tabular-nums" :class="receiptSeconds(row.id) === null ? 'text-muted-foreground' : 'border-primary text-primary'" role="timer" aria-label="Секунд до поступления">{{ receiptSeconds(row.id) ?? 120 }}</span>
             </div>
           </template>
         </DataTable>

@@ -125,7 +125,8 @@ function money(amount: number) {
 }
 
 function requestError(error: unknown, fallback: string) {
-  const message = (error as { data?: { statusMessage?: string } })?.data?.statusMessage
+  const response = (error as { data?: { statusMessage?: string; data?: { message?: string } } } | null)?.data
+  const message = response?.data?.message || response?.statusMessage
   return typeof message === 'string' ? message : fallback
 }
 
@@ -149,8 +150,8 @@ async function confirmDeleteAccount() {
   try {
     await deleteAccountRecord({ id: deletingAccount.value.id })
     deletingAccount.value = null
-  } catch {
-    toast.error('Не удалось удалить счёт.')
+  } catch (error) {
+    toast.error(requestError(error, 'Не удалось удалить счёт.'))
   }
 }
 

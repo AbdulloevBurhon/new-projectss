@@ -39,6 +39,14 @@ internal sealed class WorkshopWindow : Form
             var core = webView.CoreWebView2;
             WorkshopApi.PrepareSqlite(root, Assembly.GetExecutingAssembly());
             var api = new WorkshopApi(root);
+            var stockReceiptTimer = new Timer { Interval = 500 };
+            stockReceiptTimer.Tick += (s, e) =>
+            {
+                try { api.ProcessStockReceipts(); }
+                catch (System.Data.SQLite.SQLiteException error) { System.Diagnostics.Trace.TraceError(error.ToString()); }
+            };
+            Disposed += (s, e) => stockReceiptTimer.Dispose();
+            stockReceiptTimer.Start();
             var assets = new WorkshopAssets(environment);
             var backups = new WorkshopBackups(this, root);
 

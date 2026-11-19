@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS receipts (id TEXT PRIMARY KEY, account_id TEXT NOT NU
 CREATE TABLE IF NOT EXISTS expenses (id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT, date TEXT NOT NULL, amount REAL NOT NULL CHECK(amount > 0), note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS transfers (id TEXT PRIMARY KEY, source_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT, target_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT, date TEXT NOT NULL, amount REAL NOT NULL CHECK(amount > 0), note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK(source_account_id <> target_account_id));";
             command.ExecuteNonQuery();
+            InitializeStockReceipts(connection);
         }
     }
 

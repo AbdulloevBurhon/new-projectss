@@ -3,6 +3,7 @@ import { getAccounts } from './service'
 import { getAccounts as getLegacyAccounts, saveAccounts } from '../accounts.service'
 
 export async function loadAccounts() {
+  const accounts = tryUseNuxtApp() ? useState<AccountRecord[]>('accounts', () => []) : undefined
   let rows = await getAccounts()
   if (!rows.length && typeof window !== 'undefined') {
     let legacy: AccountRecord[]
@@ -12,7 +13,7 @@ export async function loadAccounts() {
       rows = await getAccounts()
     }
   }
-  useState<AccountRecord[]>('accounts', () => []).value = rows
+  if (accounts) accounts.value = rows
   if (rows.length || typeof window !== 'undefined') {
     try { saveAccounts(rows) } catch { /* Cache is only for existing offline selectors. */ }
   }

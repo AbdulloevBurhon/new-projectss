@@ -27,7 +27,14 @@ internal sealed partial class WorkshopApi
             result = Dispatch(args.Request.Method, new Uri(args.Request.Uri), body);
         }
         catch (ApiError error) { status = error.Status; phrase = error.Status == 404 ? "Not Found" : error.Status == 409 ? "Conflict" : "Bad Request"; result = new { statusCode = status, statusMessage = error.Message }; }
-        catch (Exception) { status = 500; phrase = "Internal Server Error"; result = new { statusCode = 500, statusMessage = "Не удалось выполнить операцию с данными." }; }
+        catch (Exception error)
+        {
+            bool pending = error is System.Data.SQLite.SQLiteException && error.Message.Contains("STOCK_RECEIPT_PENDING");
+            status = pending ? 409 : 500;
+            phrase = pending ? "Conflict" : "Internal Server Error";
+            result = new { statusCode = status, statusMessage = pending
+                ? "Удаление недоступно, пока ожидается поступление." : "Не удалось выполнить операцию с данными." };
+        }
         byte[] data = Encoding.UTF8.GetBytes(json.Serialize(result));
         args.Response = core.Environment.CreateWebResourceResponse(new MemoryStream(data, false), status, phrase, "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff");
     }
@@ -35,6 +42,7 @@ internal sealed partial class WorkshopApi
     private object Dispatch(string method, Uri uri, Dictionary<string, object> body)
     {
         string[] parts = uri.AbsolutePath.Trim('/').Split('/');
+        if (parts.Length >= 2 && parts[0] == "api" && parts[1] == "stock-receipts") return StockReceipts(method, parts, body);
         if (parts.Length >= 2 && parts[0] == "api" && parts[1] == "products") return Products(method, parts, body);
         if (parts.Length >= 2 && parts[0] == "api" && parts[1] == "warehouses") return Warehouses(method, parts, body);
         if (parts.Length < 2 || parts[0] != "api" || parts[1] != "accounts") throw new ApiError(404, "Маршрут не найден.");
