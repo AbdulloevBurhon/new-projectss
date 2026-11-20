@@ -29,5 +29,5 @@ async function support(message: string) {
 </script>
 
 <template>
-  <PinAccess brand-name="Шаурмичная" logo-text="Ш" :error="error" @submit="submit" @support="support" @clear-error="clearError" />
+  <PinAccess brand-name="Шаурмичная" logo-text="Ш" :error="error" :submitting="busy" @submit="submit" @support="support" @clear-error="clearError" />
 </template>

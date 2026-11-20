@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { Check, Copy, X } from '@lucide/vue'
 import { DataTable, Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, toast } from '@obshaya/ui'
-import { clients, requests } from '../../admin-state'
+import { activationMessages, clients, refreshRequestInbox, requests } from '../../admin-state'
 import { listClients } from '../../../../admin-endpoints/clients/clients.service'
-import { decideRequest, listActivationMessages, listRequests } from '../../../../admin-endpoints/requests/requests.service'
-import type { ActivationSupportMessage } from '../../../../admin-endpoints/requests/requests.types'
+import { decideRequest } from '../../../../admin-endpoints/requests/requests.service'
 import { onMounted, ref } from 'vue'
 
 const columns = [
@@ -16,7 +15,6 @@ const columns = [
 const busyId = ref('')
 const pinDialogOpen = ref(false)
 const approvedPin = ref('')
-const activationMessages = ref<ActivationSupportMessage[]>([])
 const activationMessageColumns = [
   { key: 'direction', label: 'Направление' }, { key: 'installationId', label: 'Устройство' },
   { key: 'body', label: 'Сообщение' }, { key: 'receivedAt', label: 'Получено' },
@@ -24,10 +22,8 @@ const activationMessageColumns = [
 onMounted(() => { void refresh() })
 
 async function refresh() {
-  try {
-    const [requestRows, messageRows] = await Promise.all([listRequests(), listActivationMessages()])
-    requests.value = requestRows; activationMessages.value = messageRows
-  } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось загрузить заявки и сообщения') }
+  try { await refreshRequestInbox() }
+  catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось загрузить заявки и сообщения') }
 }
 
 async function accept(item: (typeof requests.value)[number]) {

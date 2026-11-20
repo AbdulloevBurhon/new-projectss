@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { BackupScheduleCard, SettingsWorkspace, StorageLocationsCard, scheduledArchiveKey, useArchiveFolders } from '@obshaya/ui'
 import { clientApi, saveClientPin } from '@obshaya/contracts/client-api'
-import { createProductArchive, restoreProductArchive, uploadProductArchive } from '@obshaya/contracts/client-archive'
+import { uploadProductArchive } from '@obshaya/contracts/client-archive'
+import { createWorkshopArchive, restoreWorkshopArchive } from '../../../endpoints/settings/archive/archive.service'
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { desktopUpdates, findUpdate, installOrDownloadUpdate } from '../../../endpoints/settings/updates/updates.service'
@@ -15,6 +16,7 @@ const desktop = ref(false)
 const cloudCopyEnabled = ref(false)
 const cloudArchiveAllowed = useState('tsekh-cloud-archive-allowed', () => true)
 const uploadingArchive = ref(false)
+const archiving = ref(false)
 const { localFolder, secondaryFolder, chooseFolder } = useArchiveFolders('tsekh')
 const { schedule, last, saveSchedule, downloadLast } = inject(scheduledArchiveKey)!
 const lastBackup = computed(() => last.value && new Date(last.value.createdAt).toLocaleString('ru-RU'))
@@ -50,7 +52,14 @@ async function downloadUpdate(id: string) {
 }
 
 async function exportData() {
-  const archive = createProductArchive('tsekh')
+  if (archiving.value) return
+  archiving.value = true
+  try { await downloadArchive(await createWorkshopArchive()) }
+  catch { toast.error('Не удалось создать архив данных «Цеха».') }
+  finally { archiving.value = false }
+}
+
+async function downloadArchive(archive: Awaited<ReturnType<typeof createWorkshopArchive>>) {
   const url = URL.createObjectURL(archive.blob)
   const link = document.createElement('a'); link.href = url; link.download = archive.fileName; link.click()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
@@ -65,8 +74,14 @@ async function exportData() {
 }
 
 async function importData(file: File) {
-  try { await restoreProductArchive(file, 'tsekh'); toast.success('Данные восстановлены. Перезагрузите страницу, чтобы обновить разделы.') }
-  catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось импортировать архив.') }
+  if (archiving.value) return
+  archiving.value = true
+  try {
+    if (await restoreWorkshopArchive(file)) toast.success('Данные восстановлены. Перезагрузите страницу, чтобы обновить разделы.')
+  } catch (error) {
+    const response = (error as { data?: { data?: { message?: string }; statusMessage?: string } } | null)?.data
+    toast.error(response?.data?.message || response?.statusMessage || (error instanceof Error ? error.message : 'Не удалось импортировать архив.'))
+  } finally { archiving.value = false }
 }
 
 function setCloudCopy(enabled: boolean) {

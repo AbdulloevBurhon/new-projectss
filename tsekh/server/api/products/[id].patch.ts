@@ -1,13 +1,19 @@
-import { updateProduct, validateProductDraft } from '../../services/products/products.service'
-import type { Product } from '../../../endpoints/warehouse/products/products.types'
+import { updateProduct, updateProductBarcode, validateProductDraft } from '../../services/products/products.service'
+import { normalizeBarcode, type Product } from '../../../endpoints/warehouse/products/products.types'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Не указан товар.' })
-  let fields: Omit<Product, 'id'>
-  try { fields = validateProductDraft(await readBody(event)) }
+  const body = await readBody(event)
+  const barcodeOnly = body && typeof body === 'object' && Object.keys(body).length === 1 && Object.hasOwn(body, 'barcode')
+  let fields: Omit<Product, 'id'> | undefined
+  let barcode: string | null = null
+  try {
+    if (barcodeOnly) barcode = normalizeBarcode(body.barcode) ?? null
+    else fields = validateProductDraft(body)
+  }
   catch (error) { throw createError({ statusCode: 400, statusMessage: error instanceof Error ? error.message : 'Проверьте данные товара.' }) }
-  const product = updateProduct(id, fields)
+  const product = fields ? updateProduct(id, fields) : updateProductBarcode(id, barcode)
   if (!product) throw createError({ statusCode: 404, statusMessage: 'Товар не найден.' })
   return product
 })

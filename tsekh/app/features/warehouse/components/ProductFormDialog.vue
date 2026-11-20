@@ -4,13 +4,14 @@ import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, Input, Label,
 } from '@obshaya/ui'
-import { type Product, type ProductDraft, type ProductUnit } from '../../../../endpoints/warehouse/products/products.types'
+import { barcodeMaxLength, type Product, type ProductDraft, type ProductUnit } from '../../../../endpoints/warehouse/products/products.types'
 import ProductUnitSelect from './ProductUnitSelect.vue'
 
 const open = defineModel<boolean>('open', { required: true })
 const props = defineProps<{ product: Product | null; saving: boolean; error: string }>()
 const emit = defineEmits<{ save: [draft: ProductDraft] }>()
 const name = ref('')
+const barcode = ref('')
 const unit = ref<ProductUnit>('шт')
 const packaged = ref(false)
 const contentUnit = ref<ProductUnit>('л')
@@ -19,6 +20,7 @@ const quantityPerPiece = ref<number | string>('')
 watch(open, (isOpen) => {
   if (!isOpen) return
   name.value = props.product?.name ?? ''
+  barcode.value = props.product?.barcode ?? ''
   unit.value = props.product?.unit ?? 'шт'
   packaged.value = props.product?.quantityPerPiece !== undefined
   contentUnit.value = props.product?.contentUnit ?? (props.product?.unit === 'кг' ? 'г' : 'л')
@@ -34,7 +36,7 @@ watch(unit, (value, previous) => {
 
 function submit() {
   if (!name.value.trim()) return
-  emit('save', { name: name.value, unit: unit.value, packaged: packaged.value, contentUnit: contentUnit.value, quantityPerPiece: quantityPerPiece.value })
+  emit('save', { name: name.value, barcode: barcode.value, unit: unit.value, packaged: packaged.value, contentUnit: contentUnit.value, quantityPerPiece: quantityPerPiece.value })
 }
 </script>
 
@@ -52,7 +54,11 @@ function submit() {
       <form class="space-y-4" @submit.prevent="submit">
         <div class="space-y-2">
           <Label for="product-name">Название</Label>
-          <Input id="product-name" v-model="name" maxlength="100" required autofocus :disabled="saving" placeholder="Например, Мука" />
+          <Input id="product-name" v-model="name" maxlength="100" required :disabled="saving" placeholder="Например, Мука" />
+        </div>
+        <div class="space-y-2">
+          <Label for="product-barcode">Штрих</Label>
+          <Input id="product-barcode" v-model="barcode" :maxlength="barcodeMaxLength" :disabled="saving" autocomplete="off" spellcheck="false" />
         </div>
         <div class="space-y-2">
           <Label for="product-unit">Единица измерения</Label>

@@ -3,8 +3,7 @@ import { Archive, Bell, NotebookPen, UsersRound, Inbox, RefreshCw } from '@lucid
 import { computed, onMounted, ref } from 'vue'
 import { Button, Input, Label, Tabs, TabsContent, TabsList, TabsTrigger, Toaster, toast } from '@obshaya/ui'
 import { clearAdminKey, checkAdminKey, getAdminKey, setAdminKey } from '../../admin-endpoints/core/admin-api'
-import { listRequests } from '../../admin-endpoints/requests/requests.service'
-import { requests } from '../features/admin-state'
+import { activationMessages, refreshRequestInbox, requests } from '../features/admin-state'
 import NotesPanel from '../features/notes/components/NotesPanel.vue'
 import RequestsPanel from '../features/requests/components/RequestsPanel.vue'
 import ClientsPanel from '../features/clients/components/ClientsPanel.vue'
@@ -38,12 +37,17 @@ async function login() {
   finally { loginBusy.value = false }
 }
 
-function logout() { clearAdminKey(); authenticated.value = false }
+function logout() {
+  clearAdminKey()
+  authenticated.value = false
+  requests.value = []
+  activationMessages.value = []
+}
 
 async function refreshRequests() {
   if (refreshingRequests.value) return
   refreshingRequests.value = true
-  try { requests.value = await listRequests(); toast.success('Заявки обновлены') }
+  try { await refreshRequestInbox(); toast.success('Заявки и сообщения обновлены') }
   catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось загрузить заявки') }
   finally { refreshingRequests.value = false }
 }

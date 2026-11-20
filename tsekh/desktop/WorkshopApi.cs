@@ -42,6 +42,7 @@ internal sealed partial class WorkshopApi
     private object Dispatch(string method, Uri uri, Dictionary<string, object> body)
     {
         string[] parts = uri.AbsolutePath.Trim('/').Split('/');
+        if (parts.Length == 2 && parts[0] == "api" && parts[1] == "data-archive") return DataArchive(method, body);
         if (parts.Length >= 2 && parts[0] == "api" && parts[1] == "stock-receipts") return StockReceipts(method, parts, body);
         if (parts.Length >= 2 && parts[0] == "api" && parts[1] == "products") return Products(method, parts, body);
         if (parts.Length >= 2 && parts[0] == "api" && parts[1] == "warehouses") return Warehouses(method, parts, body);

@@ -33,6 +33,12 @@ export function isTemporaryPin() { return Number(sessionStorage.getItem(TEMP_PIN
 export function temporaryPinExpired() { return !!sessionStorage.getItem(TEMP_PIN_UNTIL_KEY) && !isTemporaryPin() }
 export function clearClientPin() { sessionStorage.removeItem(CLIENT_PIN_KEY); sessionStorage.removeItem(TEMP_PIN_UNTIL_KEY) }
 
+export class ClientApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message)
+  }
+}
+
 export async function clientApi<T>(baseUrl: string, path: string, init: RequestInit = {}, product?: ProductId): Promise<T> {
   const headers = new Headers(init.headers)
   if (init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json')
@@ -44,7 +50,7 @@ export async function clientApi<T>(baseUrl: string, path: string, init: RequestI
   }
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}${path}`, { ...init, headers })
   const payload = await response.json().catch(() => ({})) as T & { error?: string }
-  if (!response.ok) throw new Error(payload.error || `Ошибка сервера (${response.status})`)
+  if (!response.ok) throw new ClientApiError(response.status, payload.error || `Ошибка сервера (${response.status})`)
   return payload
 }
 

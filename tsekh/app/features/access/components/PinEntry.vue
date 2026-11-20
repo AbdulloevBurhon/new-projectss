@@ -55,5 +55,5 @@ async function support(message: string) {
 </script>
 
 <template>
-  <PinAccess brand-name="Цех" logo-text="Ц" :error="error" :notice="licenseNotice === 'disabled' ? 'Услуга не оплачена. Обратитесь в службу поддержки.' : ''" @submit="submit" @support="support" @clear-error="clearError" />
+  <PinAccess brand-name="Цех" logo-text="Ц" :error="error" :submitting="busy" :notice="licenseNotice === 'disabled' ? 'Услуга не оплачена. Обратитесь в службу поддержки.' : ''" @submit="submit" @support="support" @clear-error="clearError" />
 </template>

@@ -1,10 +1,12 @@
 import { reactive } from 'vue'
-import { deleteProduct, getLegacyProducts, getProducts, saveProduct, saveProducts } from './products.service'
+import { deleteProduct, getLegacyProducts, getProducts, saveProduct, saveProductBarcode, saveProducts } from './products.service'
 import type { GetProductsResult, ProductDraft } from './products.types'
 import { stockReceiptError } from '../stock-receipts/service'
 
 export function useProductsStore() {
   const state = reactive({ rows: [] as GetProductsResult, loading: true, pending: false, error: '' })
+  const barcodePending = reactive<Record<string, boolean>>({})
+  const barcodeErrors = reactive<Record<string, string>>({})
 
   async function load() {
     try {
@@ -59,5 +61,21 @@ export function useProductsStore() {
     }
   }
 
-  return { state, load, save, remove }
+  async function saveBarcode(id: string, barcode: string | null) {
+    if (barcodePending[id]) return
+    delete barcodeErrors[id]
+    if ((state.rows.find(row => row.id === id)?.barcode ?? null) === barcode) return
+    barcodePending[id] = true
+    try {
+      const saved = await saveProductBarcode(id, barcode)
+      state.rows = state.rows.map(row => row.id === id ? saved : row)
+      saveProducts(state.rows)
+    } catch (error) {
+      barcodeErrors[id] = stockReceiptError(error, 'Не удалось сохранить штрихкод.')
+    } finally {
+      delete barcodePending[id]
+    }
+  }
+
+  return { state, load, save, remove, saveBarcode, barcodePending, barcodeErrors }
 }

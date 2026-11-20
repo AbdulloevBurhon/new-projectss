@@ -17,7 +17,8 @@ interface Backup {
 
 export const scheduledArchiveKey: InjectionKey<ReturnType<typeof useScheduledArchive>> = Symbol('scheduledArchive')
 
-export function useScheduledArchive(product: ProductId, apiBase: string, canRun: () => boolean) {
+export function useScheduledArchive(product: ProductId, apiBase: string, canRun: () => boolean,
+  createArchive: () => ReturnType<typeof createProductArchive> | Promise<ReturnType<typeof createProductArchive>> = () => createProductArchive(product)) {
   const schedule = ref<SavedSchedule>()
   const last = ref<Backup>()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -54,7 +55,7 @@ export function useScheduledArchive(product: ProductId, apiBase: string, canRun:
       let local: Promise<void> | undefined
       if (slot !== undefined && (!previous || previous.slot < slot)) {
         const createdAt = new Date().toISOString()
-        const { blob } = createProductArchive(product)
+        const { blob } = await createArchive()
         const fileName = `${product}-backup.json`
         previous = { slot, createdAt, blob, fileName, cloudUploaded: false }
         await writeBackupValues(product, { latest: previous })

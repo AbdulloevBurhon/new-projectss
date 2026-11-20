@@ -1,4 +1,4 @@
-import { productUnits, type Product, type ProductDraft, type ProductUnit } from './products.types'
+import { barcodeMaxLength, normalizeBarcode, productUnits, type Product, type ProductDraft, type ProductUnit } from './products.types'
 import { getTechCards } from '../techcards/techcards.service'
 
 export const productsKey = 'obshaya:data:tsekh:products'
@@ -11,6 +11,7 @@ function isProduct(value: unknown): value is Product {
   if (!value || typeof value !== 'object') return false
   const product = value as Record<string, unknown>
   if (typeof product.id !== 'string' || typeof product.name !== 'string' || !isUnit(product.unit)) return false
+  if (product.barcode != null && (typeof product.barcode !== 'string' || product.barcode.trim().length > barcodeMaxLength)) return false
   if (product.quantityPerPiece === undefined) return product.contentUnit === undefined || isUnit(product.contentUnit)
   return (product.unit === 'шт' || product.unit === 'кг' || product.unit === 'уп')
     && isUnit(product.contentUnit)
@@ -35,12 +36,13 @@ export function validateProductDraft(draft: ProductDraft): Omit<Product, 'id'> {
     throw new Error('Для учёта содержимого выберите единицу «шт», «кг» или «уп» и единицу содержимого.')
   }
 
-  if (!draft.packaged) return { name, unit: draft.unit }
+  const barcode = normalizeBarcode(draft.barcode)
+  if (!draft.packaged) return { name, barcode, unit: draft.unit }
   const quantity = Number(draft.quantityPerPiece)
   const validQuantity = Number.isFinite(quantity) && quantity > 0 && quantity <= 1_000_000
     && Math.abs(quantity * 1000 - Math.round(quantity * 1000)) < 0.000001
   if (!validQuantity) throw new Error(`Введите количество в 1 ${draft.unit} (до 3 знаков после запятой).`)
-  return { name, unit: draft.unit, contentUnit: draft.contentUnit, quantityPerPiece: quantity }
+  return { name, barcode, unit: draft.unit, contentUnit: draft.contentUnit, quantityPerPiece: quantity }
 }
 
 export function getProducts() {
@@ -66,4 +68,8 @@ export function saveProduct(draft: ProductDraft, id?: string, previous?: Product
 export function deleteProduct(id: string) {
   if (getTechCards().some(card => card.materials.some(line => line.productId === id))) throw new Error('Товар используется в техкарте. Сначала уберите его из состава.')
   return $fetch<{ success: boolean }>(`/api/products/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function saveProductBarcode(id: string, barcode: string | null) {
+  return $fetch<Product>(`/api/products/${encodeURIComponent(id)}`, { method: 'PATCH', body: { barcode } })
 }

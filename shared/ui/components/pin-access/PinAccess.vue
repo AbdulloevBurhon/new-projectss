@@ -6,13 +6,12 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { toast } from 'vue-sonner'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 
-const props = withDefaults(defineProps<{ brandName: string; logoText?: string; error?: string; notice?: string }>(), { error: '', notice: '' })
+const props = withDefaults(defineProps<{ brandName: string; logoText?: string; error?: string; notice?: string; submitting?: boolean }>(), { error: '', notice: '', submitting: false })
 const emit = defineEmits<{ submit: [pin: string]; support: [message: string]; clearError: [] }>()
 const pin = ref('')
 const pinVisible = ref(false)
-const submitting = ref(false)
 const supportOpen = ref(false)
 const supportMessage = ref('')
 const pinInput = computed({
@@ -23,11 +22,8 @@ const pinInput = computed({
     if (pin.value.length === 5) submitPin()
   },
 })
-watch(() => props.error, value => { if (value) submitting.value = false })
-
 function submitPin() {
-  if (submitting.value || pin.value.length !== 5) return
-  submitting.value = true
+  if (props.submitting || props.notice || pin.value.length !== 5) return
   emit('submit', pin.value)
 }
 

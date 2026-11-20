@@ -9,7 +9,9 @@ const emit = defineEmits<{ export: []; import: [file: File]; toggleCloudCopy: [e
 const fileInput = ref<HTMLInputElement>()
 
 function importFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
   if (file) emit('import', file)
 }
 </script>

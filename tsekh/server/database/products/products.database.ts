@@ -12,4 +12,11 @@ database.exec(`
   )
 `)
 
+database.transaction(() => {
+  const columns = database.pragma('table_info(products)') as { name: string }[]
+  if (!columns.some(column => column.name === 'barcode')) {
+    database.exec('ALTER TABLE products ADD COLUMN barcode TEXT')
+  }
+}).immediate()
+
 export default database

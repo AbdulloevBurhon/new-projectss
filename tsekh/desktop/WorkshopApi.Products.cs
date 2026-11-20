@@ -11,7 +11,11 @@ internal sealed partial class WorkshopApi
         if (parts.Length == 3 && parts[2] == "migrate" && method == "POST") return MigrateProducts(body);
         if (parts.Length != 3) throw new ApiError(404, "Маршрут не найден.");
         string id = Uri.UnescapeDataString(parts[2]);
-        if (method == "PATCH") return UpdateProduct(id, ReadProductFields(body));
+        if (method == "PATCH")
+        {
+            if (body.Count == 1 && body.ContainsKey("barcode")) return UpdateProductBarcode(id, ReadProductBarcode(body));
+            return UpdateProduct(id, ReadProductFields(body));
+        }
         if (method == "DELETE") return DeleteProduct(id);
         throw new ApiError(405, "Метод не поддерживается.");
     }
@@ -20,7 +24,7 @@ internal sealed partial class WorkshopApi
     {
         var rows = new List<object>();
         using (SQLiteConnection connection = Open())
-        using (SQLiteCommand command = new SQLiteCommand("SELECT id,name,unit,content_unit,quantity_per_piece FROM products ORDER BY created_at DESC,rowid DESC", connection))
+        using (SQLiteCommand command = new SQLiteCommand("SELECT id,name,unit,content_unit,quantity_per_piece,barcode FROM products ORDER BY created_at DESC,rowid DESC", connection))
         using (SQLiteDataReader reader = command.ExecuteReader())
             while (reader.Read()) rows.Add(ProductRow(reader));
         return rows;
@@ -30,7 +34,7 @@ internal sealed partial class WorkshopApi
     {
         string id = Guid.NewGuid().ToString("D");
         using (SQLiteConnection connection = Open())
-        using (SQLiteCommand command = new SQLiteCommand("INSERT INTO products (id,name,unit,content_unit,quantity_per_piece) VALUES (@id,@name,@unit,@content,@quantity)", connection))
+        using (SQLiteCommand command = new SQLiteCommand("INSERT INTO products (id,name,unit,content_unit,quantity_per_piece,barcode) VALUES (@id,@name,@unit,@content,@quantity,@barcode)", connection))
         {
             BindProduct(command, id, fields); command.ExecuteNonQuery(); return GetProduct(connection, id);
         }
@@ -39,9 +43,22 @@ internal sealed partial class WorkshopApi
     private object UpdateProduct(string id, ProductData fields)
     {
         using (SQLiteConnection connection = Open())
-        using (SQLiteCommand command = new SQLiteCommand("UPDATE products SET name=@name,unit=@unit,content_unit=@content,quantity_per_piece=@quantity,updated_at=CURRENT_TIMESTAMP WHERE id=@id", connection))
+        using (SQLiteCommand command = new SQLiteCommand("UPDATE products SET name=@name,unit=@unit,content_unit=@content,quantity_per_piece=@quantity,barcode=CASE WHEN @hasBarcode THEN @barcode ELSE barcode END,updated_at=CURRENT_TIMESTAMP WHERE id=@id", connection))
         {
             BindProduct(command, id, fields);
+            command.Parameters.AddWithValue("@hasBarcode", fields.HasBarcode ? 1 : 0);
+            if (command.ExecuteNonQuery() == 0) throw new ApiError(404, "Товар не найден.");
+            return GetProduct(connection, id);
+        }
+    }
+
+    private object UpdateProductBarcode(string id, string barcode)
+    {
+        using (SQLiteConnection connection = Open())
+        using (SQLiteCommand command = new SQLiteCommand("UPDATE products SET barcode=@barcode,updated_at=CURRENT_TIMESTAMP WHERE id=@id", connection))
+        {
+            command.Parameters.AddWithValue("@id", id);
+            command.Parameters.AddWithValue("@barcode", (object)barcode ?? DBNull.Value);
             if (command.ExecuteNonQuery() == 0) throw new ApiError(404, "Товар не найден.");
             return GetProduct(connection, id);
         }
@@ -60,7 +77,7 @@ internal sealed partial class WorkshopApi
 
     private object GetProduct(SQLiteConnection connection, string id)
     {
-        using (SQLiteCommand command = new SQLiteCommand("SELECT id,name,unit,content_unit,quantity_per_piece FROM products WHERE id=@id", connection))
+        using (SQLiteCommand command = new SQLiteCommand("SELECT id,name,unit,content_unit,quantity_per_piece,barcode FROM products WHERE id=@id", connection))
         {
             command.Parameters.AddWithValue("@id", id);
             using (SQLiteDataReader reader = command.ExecuteReader()) if (reader.Read()) return ProductRow(reader);

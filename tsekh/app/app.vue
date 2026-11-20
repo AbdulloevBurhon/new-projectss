@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ClientMessages, SidebarLayout, Toaster, scheduledArchiveKey, useScheduledArchive } from '@obshaya/ui'
+import { ClientMessages, SidebarLayout, Toaster, scheduledArchiveKey, toast, useScheduledArchive } from '@obshaya/ui'
 import { clientApi, getClientPin, installationId, temporaryPinExpired, type ActivationStatus } from '@obshaya/contracts/client-api'
 import { onBeforeUnmount, onMounted, provide } from 'vue'
 import { usePinAccess } from './features/access/composables/usePinAccess'
 import { reportInstalledUpdate } from '../endpoints/settings/updates/updates.service'
+import { createWorkshopArchive } from '../endpoints/settings/archive/archive.service'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,10 +15,10 @@ const licenseNotice = useCookie<string | null>('tsekh_license_notice')
 const access = useCookie<string | null>('tsekh_pin_access')
 const cloudArchiveAllowed = useState('tsekh-cloud-archive-allowed', () => true)
 const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
-provide(scheduledArchiveKey, useScheduledArchive('tsekh', apiBase, () =>
+provide(scheduledArchiveKey, useScheduledArchive('tsekh', apiBase, () => (
   license.value === '1' && access.value === '1' && route.path !== '/pin'
-  && !route.path.startsWith('/activation') && !temporaryPinExpired() && !!getClientPin(),
-))
+  && !route.path.startsWith('/activation') && !temporaryPinExpired() && !!getClientPin()
+), createWorkshopArchive))
 let licenseTimer: ReturnType<typeof setInterval> | undefined
 const items = [
   { label: 'Главная', to: '/', icon: 'home' as const },
@@ -35,8 +36,14 @@ function navigate(to: string) {
 }
 
 function logout() {
+  access.value = null
   lock()
   void router.push('/pin')
+}
+
+function handlePinRejected() {
+  toast.error('PIN-код больше не действует. Войдите снова.')
+  logout()
 }
 
 async function refreshLicense() {
@@ -80,5 +87,5 @@ onBeforeUnmount(() => clearInterval(licenseTimer))
     <NuxtPage />
   </SidebarLayout>
   <Toaster position="bottom-right" />
-  <ClientMessages v-if="license === '1' && access === '1' && route.path !== '/pin' && !route.path.startsWith('/activation')" product="tsekh" :api-base="apiBase" />
+  <ClientMessages v-if="license === '1' && access === '1' && route.path !== '/pin' && !route.path.startsWith('/activation')" product="tsekh" :api-base="apiBase" :on-pin-rejected="handlePinRejected" />
 </template>
