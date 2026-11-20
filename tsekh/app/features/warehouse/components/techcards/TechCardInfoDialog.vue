@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@obshaya/ui'
-import type { TechCard } from '../../../../endpoints/warehouse/techcards/techcards.types'
+import type { TechCard } from '../../../../../endpoints/warehouse/techcards/techcards.types'
 const open = defineModel<boolean>('open', { required: true })
 defineProps<{ card: TechCard | null }>()
 const money = (value: number) => new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)

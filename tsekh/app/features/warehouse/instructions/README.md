@@ -1,6 +1,8 @@
-# warehouse feature
+# Организация складского раздела
 
-- components/: UI owned by this section.
-- composables/: section-specific UI behavior and orchestration.
-- Keep API calls in 	sekh/endpoints; do not import another feature's internals.
-- Keep files focused and under 120 lines; split by responsibility when needed.
+- `components/WarehousePage.vue` связывает контекст раздела и навигацию по вкладкам.
+- Внутри `components/` каждой вкладке соответствует своя папка. Список складов находится в `warehouses/`, остатки в `balance/`, история в `history/`, товары в `products/`, техкарты в `techcards/`, поступление в `receipts/`.
+- Держите таблицы, формы и диалоги рядом с вкладкой, которая ими управляет. Перед созданием компонента проверьте общую библиотеку интерфейса.
+- В `composables/warehouseContext.ts` создаётся один контекст для вкладок. Логика массового ввода находится в `composables/products/`, состояние и отсчёт поступлений в `composables/receipts/`.
+- При переключении вкладок сохраняйте черновики и активные таймеры. Проверяйте сохранение товара и отражение проведённого поступления в истории и остатках.
+- Для запросов используйте существующие сервисы в `tsekh/endpoints/`. Каждый файл раздела ограничен 120 строками. Разделяйте файлы по ответственности.

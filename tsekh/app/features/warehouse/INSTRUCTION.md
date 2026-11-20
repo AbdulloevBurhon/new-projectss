@@ -4,7 +4,7 @@
 
 - Маршрут `/warehouses` объявлен в `app/pages/warehouses/index.vue`.
 - Интерфейс раздела находится в `app/features/warehouse/components/WarehousePage.vue`.
-- Форма добавления и редактирования находится в `components/WarehouseFormDialog.vue`. Подтверждение удаления находится в `components/DeleteWarehouseDialog.vue`.
+- Форма добавления и редактирования находится в `components/warehouses/WarehouseFormDialog.vue`. Подтверждение удаления находится в `components/warehouses/DeleteWarehouseDialog.vue`.
 - В `tsekh/endpoints/warehouse/` находятся `get-warehouses`, `create-warehouse`, `update-warehouse` и `delete-warehouse`. В каждой папке есть файлы типов, сервиса и стора.
 - Склады хранятся в локальной SQLite. Сохранённые ранее данные браузера переносятся при первой загрузке.
 - В форме товара необязательное поле «Штрих» сохраняется через `/api/products` в SQLite. Вкладка «Товары» показывает его в отдельном столбце. Штрихкод хранится как текст, чтобы сохранить начальные нули.
@@ -15,3 +15,5 @@
 - В «Остатках» колонки «Открыто» и «Остаток из открытого» показывают начальные значения после прихода. Для упаковки с известным содержимым это `0 уп` и `0` в единицах содержимого. Вскрытие и поштучное списание пока не проводятся.
 - Клиентская логика поступлений находится в `composables/useStockReceipts.ts` и `tsekh/endpoints/warehouse/stock-receipts/`. Серверная логика находится в `tsekh/server/services/warehouse/`, а её реализация для Windows — в `tsekh/desktop/WorkshopApi.StockReceipts.cs`.
 - Пункт «Склады» зарегистрирован в сайдбаре в `app/app.vue`.
+
+Структура компонентов и правила изменений описаны в [инструкции раздела](instructions/README.md).

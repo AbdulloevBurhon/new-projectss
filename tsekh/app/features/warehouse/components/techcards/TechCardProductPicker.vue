@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Check, ChevronDown } from '@lucide/vue'
 import { Input } from '@obshaya/ui'
-import type { Product } from '../../../../endpoints/warehouse/products/products.types'
-import { stockUnit } from '../../../../endpoints/warehouse/techcards/techcards.service'
+import type { Product } from '../../../../../endpoints/warehouse/products/products.types'
+import { stockUnit } from '../../../../../endpoints/warehouse/techcards/techcards.service'
 
 const props = defineProps<{ products: Product[]; selectedIds: Set<string>; disabled?: boolean }>()
 const emit = defineEmits<{ toggle: [product: Product] }>()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed,ref } from 'vue'
 import { Dialog,DialogContent,DialogHeader,DialogTitle,Input,Button } from '@obshaya/ui'
-import type { Goods,Location } from '../../../../endpoints/sales/service'
+import type { Goods,Location } from '../../../../../endpoints/sales/service'
 const props=defineProps<{mode:'transfer'|'adjust';goods:Goods[];warehouses:Location[]}>()
 const emit=defineEmits<{close:[];done:[]}>()
 const lot=ref(''),target=ref(''),qty=ref<number>(),busy=ref(false),error=ref('')

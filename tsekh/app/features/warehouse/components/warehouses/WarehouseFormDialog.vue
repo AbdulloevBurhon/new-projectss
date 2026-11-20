@@ -4,7 +4,7 @@ import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, Input, Label,
 } from '@obshaya/ui'
-import { warehouseTypeLabels, type Warehouse, type WarehouseDraft, type WarehouseType } from '../../../../endpoints/warehouse/get-warehouses/get-warehouses.types'
+import { warehouseTypeLabels, type Warehouse, type WarehouseDraft, type WarehouseType } from '../../../../../endpoints/warehouse/get-warehouses/get-warehouses.types'
 
 const open = defineModel<boolean>('open', { required: true })
 const props = defineProps<{ warehouse: Warehouse | null; saving: boolean; error: string }>()

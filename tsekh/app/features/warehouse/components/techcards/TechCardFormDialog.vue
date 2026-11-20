@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Label } from '@obshaya/ui'
-import type { Product } from '../../../../endpoints/warehouse/products/products.types'
-import type { TechCard, TechCardDraft, TechCardMaterialDraft } from '../../../../endpoints/warehouse/techcards/techcards.types'
-import { materialPieces, stockUnit } from '../../../../endpoints/warehouse/techcards/techcards.service'
+import type { Product } from '../../../../../endpoints/warehouse/products/products.types'
+import type { TechCard, TechCardDraft, TechCardMaterialDraft } from '../../../../../endpoints/warehouse/techcards/techcards.types'
+import { materialPieces, stockUnit } from '../../../../../endpoints/warehouse/techcards/techcards.service'
 import TechCardProductPicker from './TechCardProductPicker.vue'
 import TechCardMaterialRow from './TechCardMaterialRow.vue'
 

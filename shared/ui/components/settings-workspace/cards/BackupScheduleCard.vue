@@ -66,6 +66,7 @@ function saveSchedule() {
       <div class="space-y-1"><label class="flex items-center gap-2 text-sm"><input v-model="cloudCopy" type="checkbox" class="size-4 accent-lime-500">Копировать в облако</label><p v-if="!props.cloudArchiveAllowed" class="text-xs text-red-600" role="alert">Администратор запретил сохранять данные в облако.</p></div>
       <Button :disabled="!intervalValid" @click="saveSchedule"><Save :size="16" />Сохранить расписание</Button>
       <p v-if="lastBackup" class="text-sm text-slate-600">Последняя копия · {{ lastBackup }}</p>
+      <slot name="status" />
       <Button v-if="lastBackup" variant="outline" @click="emit('downloadLast')">Скачать последнюю копию</Button>
     </CardContent>
   </Card>

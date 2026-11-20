@@ -4,7 +4,7 @@ import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, Input, Label,
 } from '@obshaya/ui'
-import { barcodeMaxLength, type Product, type ProductDraft, type ProductUnit } from '../../../../endpoints/warehouse/products/products.types'
+import { barcodeMaxLength, type Product, type ProductDraft, type ProductUnit } from '../../../../../endpoints/warehouse/products/products.types'
 import ProductUnitSelect from './ProductUnitSelect.vue'
 
 const open = defineModel<boolean>('open', { required: true })

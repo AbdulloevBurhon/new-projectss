@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Input } from '@obshaya/ui'
-import type { Product } from '../../../../endpoints/warehouse/products/products.types'
-import type { TechCardMaterialDraft } from '../../../../endpoints/warehouse/techcards/techcards.types'
-import { materialLimit } from '../../../../endpoints/warehouse/techcards/techcards.service'
+import type { Product } from '../../../../../endpoints/warehouse/products/products.types'
+import type { TechCardMaterialDraft } from '../../../../../endpoints/warehouse/techcards/techcards.types'
+import { materialLimit } from '../../../../../endpoints/warehouse/techcards/techcards.service'
 
 const line = defineModel<TechCardMaterialDraft>('line', { required: true })
 const props = defineProps<{ product?: Product; disabled?: boolean }>()

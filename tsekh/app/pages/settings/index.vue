@@ -101,18 +101,21 @@ onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEvent
 </script>
 
 <template>
-  <SettingsWorkspace product-name="Цех" :current-version="appVersion" :install-updates="desktop" :installing-update="installingUpdate" :online="online" :update-available="updateAvailable" :cloud-copy-enabled="cloudCopyEnabled" :uploading-archive="uploadingArchive" @change-pin="changePin" @check-updates="checkUpdates" @download-update="downloadUpdate" @export-data="exportData" @import-data="importData" @toggle-cloud-copy="setCloudCopy">
+  <SettingsWorkspace class="[&_section.auto-rows-fr]:auto-rows-auto" product-name="Цех" :current-version="appVersion" :install-updates="desktop" :installing-update="installingUpdate" :online="online" :update-available="updateAvailable" :cloud-copy-enabled="cloudCopyEnabled" :uploading-archive="uploadingArchive" @change-pin="changePin" @check-updates="checkUpdates" @download-update="downloadUpdate" @export-data="exportData" @import-data="importData" @toggle-cloud-copy="setCloudCopy">
     <StorageLocationsCard
       :local-path="localFolder?.name"
       :secondary-path="secondaryFolder?.name"
       @choose-local="chooseFolder('local')"
       @choose-secondary="chooseFolder('secondary')"
     />
-    <div v-if="last" class="grid gap-1 text-sm" aria-live="polite">
-      <span>Компьютер · {{last.local || 'Запись не подтверждена'}}</span>
-      <span>USB / вторая папка · {{last.secondary || 'Запись не подтверждена'}}</span>
-      <span>Облако · {{last.cloudUploaded?'Сохранено':!cloudArchiveAllowed?'Запрещено администратором':schedule?.cloudCopy?'Ожидает отправки':'Отключено'}}</span>
-    </div>
-    <BackupScheduleCard :schedule="schedule" :last-backup="lastBackup" :cloud-archive-allowed="cloudArchiveAllowed" @save="saveSchedule" @download-last="downloadLast" @cloud-copy-denied="denyCloudCopy" />
+    <BackupScheduleCard :schedule="schedule" :last-backup="lastBackup" :cloud-archive-allowed="cloudArchiveAllowed" @save="saveSchedule" @download-last="downloadLast" @cloud-copy-denied="denyCloudCopy">
+      <template #status>
+        <div v-if="last" class="grid gap-1 text-xs text-slate-600" aria-live="polite">
+          <span>Компьютер · {{last.local || 'Запись не подтверждена'}}</span>
+          <span>USB / вторая папка · {{last.secondary || 'Запись не подтверждена'}}</span>
+          <span>Облако · {{last.cloudUploaded?'Сохранено':!cloudArchiveAllowed?'Запрещено администратором':schedule?.cloudCopy?'Ожидает отправки':'Отключено'}}</span>
+        </div>
+      </template>
+    </BackupScheduleCard>
   </SettingsWorkspace>
 </template>
