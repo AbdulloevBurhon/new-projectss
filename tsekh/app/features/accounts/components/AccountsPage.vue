@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ArrowDownToLine, ArrowLeftRight, ArrowUpFromLine, Info, Pencil, Plus, Trash2, Wallet } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
-import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button, DataTable, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Input, Tabs, TabsContent, TabsList, TabsTrigger, toast } from '@obshaya/ui'
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button, DataTable, Input, Tabs, TabsContent, TabsList, TabsTrigger, toast } from '@obshaya/ui'
+import AccountDetailsDialog from './AccountDetailsDialog.vue'
 import AccountFormDialog from './AccountFormDialog.vue'
 import AccountMovementFormDialog from './AccountMovementFormDialog.vue'
 import type { AccountRecord } from '../../../../endpoints/accounts/get-accounts/types'
@@ -345,15 +346,7 @@ function updateDeleteDialog(open: boolean) {
       </TabsContent>
     </Tabs>
     <AccountFormDialog v-model:open="accountDialogOpen" :account="editingAccount" @save="saveAccount" />
-    <Dialog :open="!!viewingAccount" @update:open="open => { if (!open) viewingAccount = null }">
-      <DialogContent v-if="viewingAccount">
-        <DialogHeader>
-          <DialogTitle>{{ viewingAccount.name }}</DialogTitle>
-          <DialogDescription>Информация о счёте</DialogDescription>
-        </DialogHeader>
-        <p class="text-sm text-muted-foreground">Сумма: <strong class="text-foreground">{{ money(viewingAccount.amount) }} сом</strong></p>
-      </DialogContent>
-    </Dialog>
+    <AccountDetailsDialog v-if="viewingAccount" :account="viewingAccount" @close="viewingAccount = null" />
     <AlertDialog :open="!!deletingAccount" @update:open="open => { if (!open) deletingAccount = null }">
       <AlertDialogContent>
         <AlertDialogHeader>

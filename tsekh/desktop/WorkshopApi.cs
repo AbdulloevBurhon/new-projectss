@@ -52,6 +52,7 @@ internal sealed partial class WorkshopApi
         if (parts[2] == "receipts") return Receipts(method, parts, uri, body);
         if (parts[2] == "expenses") return Expenses(method, parts, uri, body);
         if (parts[2] == "transfers") return Transfers(method, parts, uri, body);
+        if (parts.Length == 3 && method == "GET") return AccountDetails(Uri.UnescapeDataString(parts[2]));
         throw new ApiError(404, "Маршрут не найден.");
     }
 
