@@ -37,7 +37,7 @@ export function useProductsStore() {
       saveProducts(state.rows)
       return true
     } catch (error) {
-      state.error = error instanceof Error ? error.message : 'Не удалось сохранить товар.'
+      state.error = stockReceiptError(error, 'Не удалось сохранить товар.')
       return false
     } finally {
       state.pending = false

@@ -1,4 +1,4 @@
-import { updateProduct, updateProductBarcode, validateProductDraft } from '../../services/products/products.service'
+import { duplicateBarcodeCode, updateProduct, updateProductBarcode, validateProductDraft } from '../../services/products/products.service'
 import { normalizeBarcode, type Product } from '../../../endpoints/warehouse/products/products.types'
 
 export default defineEventHandler(async (event) => {
@@ -13,7 +13,12 @@ export default defineEventHandler(async (event) => {
     else fields = validateProductDraft(body)
   }
   catch (error) { throw createError({ statusCode: 400, statusMessage: error instanceof Error ? error.message : 'Проверьте данные товара.' }) }
-  const product = fields ? updateProduct(id, fields) : updateProductBarcode(id, barcode)
+  let product: Product | undefined
+  try { product = fields ? updateProduct(id, fields) : updateProductBarcode(id, barcode) }
+  catch (error) {
+    if (error instanceof Error && error.message === duplicateBarcodeCode) throw createError({ statusCode: 409, statusMessage: 'Товар с таким штрихкодом уже существует.' })
+    throw error
+  }
   if (!product) throw createError({ statusCode: 404, statusMessage: 'Товар не найден.' })
   return product
 })

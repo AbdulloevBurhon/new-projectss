@@ -6,7 +6,7 @@ using System.Linq;
 internal sealed partial class WorkshopApi
 {
     private static readonly string[] ArchiveTables =
-        { "accounts", "warehouses", "products", "receipts", "expenses", "transfers", "stock_receipts" };
+        { "accounts", "warehouses", "products", "receipts", "expenses", "transfers", "stock_receipts", "clients", "sales", "sale_lines", "stock_movements" };
 
     private static ApiError InvalidArchive()
     {
@@ -90,6 +90,9 @@ internal sealed partial class WorkshopApi
         if (!body.TryGetValue("version", out version) || !(version is int) || (int)version != 1 ||
             !body.TryGetValue("tables", out source)) throw InvalidArchive();
         var tables = source as Dictionary<string, object>;
+        if (tables != null && tables.Count == 7 && ArchiveTables.Take(7).All(t => tables.ContainsKey(t)))
+            foreach (string t in ArchiveTables.Skip(7)) tables.Add(t, new object[0]);
+        if(tables != null && tables.Count == 10 && ArchiveTables.Take(10).All(t => tables.ContainsKey(t))) tables.Add("stock_movements",new object[0]);
         if (tables == null || tables.Count != ArchiveTables.Length) throw InvalidArchive();
 
         try

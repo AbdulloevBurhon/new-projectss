@@ -2,7 +2,7 @@ import type { AccountRecord } from '../get-accounts/types'
 
 export interface AccountOutflow {
   id: string
-  kind: 'purchase' | 'expense' | 'transfer'
+  kind: 'purchase' | 'expense' | 'transfer' | 'transfer-in' | 'sale' | 'receipt'
   date: string
   description: string
   amount: number

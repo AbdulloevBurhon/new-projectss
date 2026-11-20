@@ -32,6 +32,16 @@ internal sealed partial class WorkshopApi
         return string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
     }
 
+    private static void EnsureProductBarcodeAvailable(SQLiteConnection connection, SQLiteTransaction transaction, string barcode, string id)
+    {
+        if (String.IsNullOrWhiteSpace(barcode)) return;
+        using (SQLiteCommand command = new SQLiteCommand("SELECT id FROM products WHERE barcode=@barcode COLLATE NOCASE AND id<>@id LIMIT 1", connection, transaction))
+        {
+            command.Parameters.AddWithValue("@barcode", barcode.Trim()); command.Parameters.AddWithValue("@id", id);
+            if (command.ExecuteScalar() != null) throw new ApiError(409, "Товар с таким штрихкодом уже существует.");
+        }
+    }
+
     private static Dictionary<string, object> ProductRow(SQLiteDataReader reader)
     {
         var row = new Dictionary<string, object> { { "id", reader.GetString(0) }, { "name", reader.GetString(1) }, { "unit", reader.GetString(2) } };
@@ -93,10 +103,12 @@ internal sealed partial class WorkshopApi
         if (id.Length == 0 || id.Length > 100 || name.Length == 0 || name.Length > 100 || Array.IndexOf(ProductUnits, unit) < 0
             || (hasContent && Array.IndexOf(ProductUnits, content) < 0) || (hasQuantity && (double.IsNaN(quantity) || double.IsInfinity(quantity) || quantity <= 0 || quantity > 1000000)))
             throw new ApiError(400, "Некорректные сохранённые товары.");
+        string barcode = ReadProductBarcode(row);
+        EnsureProductBarcodeAvailable(connection, transaction, barcode, id);
         using (SQLiteCommand command = new SQLiteCommand("INSERT INTO products (id,name,unit,content_unit,quantity_per_piece,barcode) VALUES (@id,@name,@unit,@content,@quantity,@barcode)", connection, transaction))
         {
             BindProduct(command, id, new ProductData(name, unit, hasContent ? content : null,
-                hasQuantity ? (double?)quantity : null, ReadProductBarcode(row), row.ContainsKey("barcode")));
+                hasQuantity ? (double?)quantity : null, barcode, row.ContainsKey("barcode")));
             command.ExecuteNonQuery();
         }
     }

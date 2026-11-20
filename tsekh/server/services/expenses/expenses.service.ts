@@ -18,7 +18,7 @@ export function validateExpenseDraft(value: ExpenseDraft) {
   const date = typeof value?.date === 'string' ? new Date(`${value.date}T00:00:00.000Z`) : null
   const validDate = date && !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value.date
   if (!validDate || typeof value.accountId !== 'string' || !value.accountId
-      || !Number.isFinite(value.amount) || value.amount <= 0 || value.amount > 1_000_000
+      || !Number.isFinite(value.amount) || value.amount <= 0 || value.amount > 1_000_000 || Number(value.amount.toFixed(2)) !== value.amount
       || typeof value.note !== 'string' || value.note.length > 240) {
     throw createError({ statusCode: 400, statusMessage: 'Проверьте счёт, дату, сумму и заметку.' })
   }
@@ -31,8 +31,8 @@ const projection = `SELECT e.id, e.date, e.account_id AS accountId, e.amount, e.
 const list = database.prepare(`${projection} ORDER BY e.date DESC, e.created_at DESC, e.rowid DESC`)
 const find = database.prepare(`${projection} WHERE e.id = ?`)
 const insert = database.prepare('INSERT INTO expenses (id, account_id, date, amount, note) VALUES (?, ?, ?, ?, ?)')
-const addBalance = database.prepare('UPDATE accounts SET amount = amount + ? WHERE id = ?')
-const subtractBalance = database.prepare('UPDATE accounts SET amount = amount - ? WHERE id = ? AND amount >= ?')
+const addBalance = database.prepare('UPDATE accounts SET amount = (CAST(ROUND(amount*100) AS INTEGER) + CAST(ROUND(?*100) AS INTEGER))/100.0 WHERE id = ?')
+const subtractBalance = database.prepare('UPDATE accounts SET amount = (CAST(ROUND(amount*100) AS INTEGER) - CAST(ROUND(?*100) AS INTEGER))/100.0 WHERE id = ? AND ROUND(amount*100) >= ROUND(?*100)')
 const accountExists = database.prepare('SELECT 1 FROM accounts WHERE id = ?')
 
 function ensureFunds(accountId: string, amount: number) {

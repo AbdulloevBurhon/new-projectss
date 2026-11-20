@@ -65,12 +65,13 @@ using System.Reflection;
 internal static class DesktopConfig { internal const string ApiBase = "$apiBase"; }
 "@ | Set-Content -LiteralPath $versionSource -Encoding UTF8
     $sources += $versionSource
+    $salesSql = Join-Path $PSScriptRoot '../server/database/sales/queries.json'
     $bridge = Join-Path $PSScriptRoot 'bridge.js'
     & (Join-Path $framework 'csc.exe') /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 `
         /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Data.dll /reference:System.IO.Compression.dll `
         "/reference:$core" "/reference:$forms" "/reference:$sqliteAssembly" "/resource:$core,Microsoft.Web.WebView2.Core.dll" "/resource:$forms,Microsoft.Web.WebView2.WinForms.dll" `
         "/resource:$sqliteAssembly,System.Data.SQLite.dll" "/resource:$sqliteNative,SQLite.Interop.dll" "/resource:$loader,WebView2Loader.dll" `
-        "/resource:$archive,renderer.zip" "/resource:$bridge,bridge.js" "/resource:$license,WebView2-License.txt" "/out:$artifact" @sources
+        "/resource:$salesSql,sales.json" "/resource:$archive,renderer.zip" "/resource:$bridge,bridge.js" "/resource:$license,WebView2-License.txt" "/out:$artifact" @sources
     if ($LASTEXITCODE -ne 0) { throw 'Windows application compilation failed.' }
     Get-Item -LiteralPath $artifact | Select-Object FullName, Length
 } finally {

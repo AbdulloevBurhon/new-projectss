@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Archive, ArrowLeftRight, Boxes, Inbox, Info, NotebookPen, Pencil, Plus, RefreshCw, SlidersHorizontal, Trash2, Warehouse as WarehouseIcon } from '@lucide/vue'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import StockMovementDialog from './StockMovementDialog.vue'
+import { type Goods } from '../../../../endpoints/sales/service'
 import { Button, DataTable, Input, Tabs, TabsContent, TabsList, TabsTrigger, toast } from '@obshaya/ui'
 import { warehousesKey } from '../../../../endpoints/warehouse/get-warehouses/get-warehouses.service'
 import { useGetWarehousesStore } from '../../../../endpoints/warehouse/get-warehouses/get-warehouses.store'
@@ -14,6 +16,7 @@ import { barcodeMaxLength, type Product, type ProductDraft } from '../../../../e
 import WarehouseFormDialog from './WarehouseFormDialog.vue'
 import DeleteWarehouseDialog from './DeleteWarehouseDialog.vue'
 import ProductFormDialog from './ProductFormDialog.vue'
+import ProductBulkEntry from './ProductBulkEntry.vue'
 import DeleteProductDialog from './DeleteProductDialog.vue'
 import { techCardsKey } from '../../../../endpoints/warehouse/techcards/techcards.service'
 import { useTechCardsStore } from '../../../../endpoints/warehouse/techcards/techcards.store'
@@ -45,6 +48,7 @@ const selectedProduct = ref<Product | null>(null)
 const productDeleteOpen = ref(false)
 const deletingProduct = ref<Product | null>(null)
 const productSearch = ref('')
+const productView = ref('mass')
 const warehouseSearch = ref('')
 const techCardSearch = ref('')
 const receiptSearch = ref('')
@@ -96,34 +100,38 @@ const warehouseNames = computed(() => {
   return names
 })
 const listedWarehouses = computed(() => [...warehouseNames.value].map(([id, name]) => ({ id, name })))
-const historyRows = computed(() => posted.value.filter(row => {
+type HistoryEntry = {id:string;operation:string;postedAt:number|null;warehouseId:string;warehouseName:string;productName:string;quantity:number|null;unit:string;total:number|null}
+const movements=ref<HistoryEntry[]>([])
+const movement=ref<'transfer'|'adjust'>()
+const revision=ref(0)
+const historyRows = computed(() => [...posted.value.map(r=>({...r,operation:'Приход'})),...movements.value].sort((a,b)=>(b.postedAt??0)-(a.postedAt??0)).filter(row => {
   const date = new Date(row.postedAt!)
   const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   return (!historyWarehouseId.value || row.warehouseId === historyWarehouseId.value)
     && (!historyFrom.value || day >= historyFrom.value)
     && (!historyTo.value || day <= historyTo.value)
 }))
-const historyTotal = computed(() => historyRows.value.reduce((total, row) => total + (row.total ?? 0), 0))
-const balanceRows = computed(() => {
-  const totals = new Map<string, { id: string; product: string; warehouse: string; unit: string; stock: number; contentStock: number; contentUnit: string | null }>()
-  for (const row of posted.value) {
-    if (balanceWarehouseId.value && row.warehouseId !== balanceWarehouseId.value) continue
-    const id = JSON.stringify([row.warehouseId, row.productId, row.unit, row.contentUnit])
-    let total = totals.get(id)
-    if (!total) {
-      const product = products.state.rows.find(product => product.id === row.productId)
-      total = {
-        id, product: product?.name ?? row.productName, warehouse: warehouseNames.value.get(row.warehouseId) ?? row.warehouseName,
-        unit: row.unit, stock: 0, contentStock: 0, contentUnit: row.contentUnit,
-      }
-      totals.set(id, total)
-    }
-    total.stock += row.quantity ?? 0
-    total.contentStock += (row.quantity ?? 0) * (row.quantityPerPiece ?? 0)
+const historyTotal = computed(() => historyRows.value.filter(r=>r.operation==="Приход").reduce((total, row) => total + (row.total ?? 0), 0))
+const stockCatalog=ref<Goods[]>([])
+const stockError=ref('')
+watch([activeTab,posted,revision],async ([tab],_,onCleanup)=>{
+  if(tab!=='balance' && tab!=='history')return
+  let active=true
+  onCleanup(()=>{active=false})
+  try {
+    if(tab==='balance'){const rows=await $fetch<Goods[]>('/api/sales/stock');if(active)stockCatalog.value=rows}
+    else {const rows=await $fetch<HistoryEntry[]>('/api/sales/history');if(active)movements.value=rows}
+    if(active)stockError.value=''
   }
-  const search = balanceSearch.value.trim().toLocaleLowerCase('ru')
-  return [...totals.values()].filter(row => row.product.toLocaleLowerCase('ru').includes(search))
-})
+  catch {if(active)stockError.value='Не удалось загрузить остатки.'}
+},{immediate:true})
+const balanceRows=computed(()=>stockCatalog.value.filter(p=>(!balanceWarehouseId.value || p.warehouse===balanceWarehouseId.value)
+  && p.name.toLowerCase().includes(balanceSearch.value.trim().toLowerCase())).map(p=>{
+    const packaged=!!p.contentUnit && ['шт','уп'].includes(p.unit)
+    const stock=packaged?Math.floor(p.stock):p.stock
+    return {...p,product:p.name,warehouse:warehouseNames.value.get(p.warehouse),stock,contentStock:p.stock*p.factor,
+      opened:Number(packaged && p.stock>stock),remaining:(p.stock-stock)*p.factor}
+  }))
 const balanceColumns = [
   { key: 'product', label: 'Товар' },
   { key: 'warehouse', label: 'Склад' },
@@ -271,6 +279,13 @@ async function saveProduct(draft: ProductDraft) {
   toast.success(selectedProduct.value ? 'Товар изменён.' : 'Товар добавлен.')
 }
 
+async function saveMassProduct(draft: ProductDraft, id?: string) {
+  if (!await products.save(draft, id)) return null
+  const saved = products.state.rows.find(product => product.id === id) ?? products.state.rows[0]
+  if (saved) toast.success(id ? 'Товар изменён.' : 'Товар добавлен.')
+  return saved ?? null
+}
+
 async function confirmDeleteProduct() {
   if (!deletingProduct.value || !await products.remove(deletingProduct.value.id)) return
   productDeleteOpen.value = false
@@ -359,23 +374,24 @@ onBeforeUnmount(() => window.removeEventListener('storage', handleStorage))
           <select v-model="balanceWarehouseId" aria-label="Склад" class="h-10 min-w-48 rounded-md border bg-background px-3 text-sm"><option value="">Все склады</option><option v-for="warehouse in listedWarehouses" :key="warehouse.id" :value="warehouse.id">{{ warehouse.name }}</option></select>
           <Input v-model="balanceSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
           <div class="ml-auto flex flex-wrap gap-2">
-            <Button type="button" variant="outline"><ArrowLeftRight class="size-4" />Перемещение</Button>
-            <Button type="button" variant="outline"><SlidersHorizontal class="size-4" />Корректировка</Button>
+            <Button type="button" variant="outline" @click="movement='transfer'"><ArrowLeftRight class="size-4" />Перемещение</Button>
+            <Button type="button" variant="outline" @click="movement='adjust'"><SlidersHorizontal class="size-4" />Корректировка</Button>
           </div>
         </div>
         <p v-if="receiptLoadError" class="text-sm text-destructive" role="alert">{{ receiptLoadError }}</p>
+        <p v-if="stockError" role="alert">{{stockError}}</p>
         <DataTable :columns="balanceColumns" :rows="balanceRows" empty-text="Остатков пока нет">
           <template #cell-stock="{ row }">{{ numberFormat.format(row.stock) }} {{ row.unit }}</template>
           <template #cell-contentStock="{ row }">{{ row.contentUnit ? `${numberFormat.format(row.contentStock)} ${row.contentUnit}` : '—' }}</template>
-          <template #cell-opened="{ row }">{{ row.contentUnit || row.unit === 'уп' ? `0 ${row.unit}` : '—' }}</template>
-          <template #cell-openedRemaining="{ row }">{{ row.contentUnit ? `0 ${row.contentUnit}` : '—' }}</template>
+          <template #cell-opened="{ row }">{{ row.contentUnit || row.unit === 'уп' ? `${row.opened} ${row.unit}` : '—' }}</template>
+          <template #cell-openedRemaining="{ row }">{{ row.contentUnit ? `${numberFormat.format(row.remaining)} ${row.contentUnit}` : '—' }}</template>
         </DataTable>
       </TabsContent>
 
       <TabsContent value="history" class="space-y-4">
         <div class="grid gap-3 sm:grid-cols-3">
-          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Поступления</p><p class="mt-1 text-xl font-semibold">{{ historyRows.length }}</p></div>
-          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Расходы</p><p class="mt-1 text-xl font-semibold">—</p></div>
+          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Поступления</p><p class="mt-1 text-xl font-semibold">{{ historyRows.filter(r=>r.operation==='Приход').length }}</p></div>
+          <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Расходы</p><p class="mt-1 text-xl font-semibold">{{ historyRows.filter(r=>(r.quantity??0)<0).length }}</p></div>
           <div class="rounded-xl border bg-background p-4"><p class="text-sm text-muted-foreground">Сумма поступлений</p><p class="mt-1 text-xl font-semibold">{{ money(historyTotal) }} сом</p></div>
         </div>
         <div class="flex flex-wrap items-end gap-3">
@@ -386,34 +402,45 @@ onBeforeUnmount(() => window.removeEventListener('storage', handleStorage))
         </div>
         <p v-if="receiptLoadError" class="text-sm text-destructive" role="alert">{{ receiptLoadError }}</p>
         <DataTable :columns="historyColumns" :rows="historyRows" empty-text="Операций пока нет">
-          <template #cell-operation="{ row }">Приход <small class="block text-muted-foreground">{{ operationDate.format(row.postedAt) }}</small></template>
+          <template #cell-operation="{ row }">{{ row.operation }} <small class="block text-muted-foreground">{{ operationDate.format(row.postedAt) }}</small></template>
           <template #cell-product="{ row }">{{ row.productName }}</template>
           <template #cell-warehouse="{ row }">{{ row.warehouseName }}</template>
           <template #cell-quantity="{ row }">{{ numberFormat.format(row.quantity) }} {{ row.unit }}</template>
           <template #cell-opened="{ row }">{{ row.unit === 'уп' || row.contentUnit ? '0' : '—' }}</template>
-          <template #cell-sum="{ row }">{{ money(row.total) }} сом</template>
+          <template #cell-sum="{ row }">{{ row.total == null ? '—' : money(row.total)+' сом' }}</template>
         </DataTable>
       </TabsContent>
 
       <TabsContent value="products" class="space-y-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <Input v-model="productSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
-          <Button class="ml-auto" :disabled="products.state.loading || !!products.state.error" @click="openProductForm()"><Plus class="size-4" />Товар</Button>
-        </div>
-        <p v-if="products.state.loading" class="text-sm text-muted-foreground" role="status">Загрузка товаров…</p>
-        <p v-else-if="products.state.error" class="text-sm text-destructive" role="alert">{{ products.state.error }}</p>
-        <DataTable v-else :columns="productColumns" :rows="visibleProducts" :empty-text="productSearch.trim() ? 'Совпадений не найдено' : 'Товаров пока нет'">
-          <template #cell-unit="{ row }">
-            <span>{{ row.unit }}</span>
-            <small v-if="row.quantityPerPiece" class="block text-muted-foreground">{{ row.quantityPerPiece }} {{ row.contentUnit }} в 1 {{ row.unit }}</small>
-          </template>
-          <template #cell-actions="{ row }">
-            <div class="flex justify-end gap-1">
-              <Button size="icon" variant="ghost" :aria-label="`Изменить товар ${row.name}`" @click="openProductForm(row)"><Pencil class="size-4 text-blue-600" /></Button>
-              <Button size="icon" variant="ghost" :aria-label="`Удалить товар ${row.name}`" @click="openProductDelete(row)"><Trash2 class="size-4 text-destructive" /></Button>
-            </div>
-          </template>
-        </DataTable>
+        <Tabs v-model:model-value="productView" class="space-y-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <TabsList class="h-auto w-fit rounded-xl bg-muted p-1">
+              <TabsTrigger value="mass" class="h-9 rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><Plus class="size-4 text-blue-600" />Массово</TabsTrigger>
+              <TabsTrigger value="list" class="h-9 rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><Archive class="size-4 text-blue-600" />Товары</TabsTrigger>
+            </TabsList>
+            <Input v-if="productView === 'list'" v-model="productSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
+            <Button v-if="productView === 'list'" class="ml-auto" :disabled="products.state.loading || !!products.state.error" @click="openProductForm()"><Plus class="size-4" />Товар</Button>
+          </div>
+          <p v-if="products.state.loading" class="text-sm text-muted-foreground" role="status">Загрузка товаров…</p>
+          <p v-else-if="products.state.error && productView === 'list'" class="text-sm text-destructive" role="alert">{{ products.state.error }}</p>
+          <TabsContent value="mass">
+            <ProductBulkEntry v-if="!products.state.loading" :save="saveMassProduct" :error="products.state.error" />
+          </TabsContent>
+          <TabsContent value="list">
+            <DataTable v-if="!products.state.loading && !products.state.error" :columns="productColumns" :rows="visibleProducts" :empty-text="productSearch.trim() ? 'Совпадений не найдено' : 'Товаров пока нет'">
+              <template #cell-unit="{ row }">
+                <span>{{ row.unit }}</span>
+                <small v-if="row.quantityPerPiece" class="block text-muted-foreground">{{ row.quantityPerPiece }} {{ row.contentUnit }} в 1 {{ row.unit }}</small>
+              </template>
+              <template #cell-actions="{ row }">
+                <div class="flex justify-end gap-1">
+                  <Button size="icon" variant="ghost" :aria-label="`Изменить товар ${row.name}`" @click="openProductForm(row)"><Pencil class="size-4 text-blue-600" /></Button>
+                  <Button size="icon" variant="ghost" :aria-label="`Удалить товар ${row.name}`" @click="openProductDelete(row)"><Trash2 class="size-4 text-destructive" /></Button>
+                </div>
+              </template>
+            </DataTable>
+          </TabsContent>
+        </Tabs>
       </TabsContent>
 
       <TabsContent value="techcards" class="space-y-4">
@@ -482,6 +509,7 @@ onBeforeUnmount(() => window.removeEventListener('storage', handleStorage))
         </DataTable>
       </TabsContent>
     </Tabs>
+    <StockMovementDialog v-if="movement" :mode="movement" :goods="stockCatalog" :warehouses="listedWarehouses" @close="movement=undefined" @done="movement=undefined;revision++" />
     <ProductFormDialog v-model:open="productDialogOpen" :product="selectedProduct" :saving="products.state.pending" :error="products.state.error" @save="saveProduct" />
     <DeleteProductDialog v-model:open="productDeleteOpen" :name="deletingProduct?.name || ''" :pending="products.state.pending" :error="products.state.error" @confirm="confirmDeleteProduct" />
     <WarehouseFormDialog v-model:open="dialogOpen" :warehouse="editing" :saving="formStore.pending.value" :error="formStore.error.value" @save="save" />

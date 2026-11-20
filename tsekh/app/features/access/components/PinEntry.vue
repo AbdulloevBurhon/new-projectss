@@ -15,7 +15,7 @@ let statusTimer: ReturnType<typeof setInterval> | undefined
 async function refreshDisabledStatus() {
   if (licenseNotice.value !== 'disabled' || !navigator.onLine) return
   try {
-    const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId('tsekh')}`)
+    const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId('tsekh')}`, {signal:AbortSignal.timeout(4500)})
     if (status.licenseStatus === 'active' && status.productId === 'tsekh' && status.licenseUntil) {
       license.value = '1'; licenseUntil.value = status.licenseUntil; licenseNotice.value = null
       await navigateTo('/pin')

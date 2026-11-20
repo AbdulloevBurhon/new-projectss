@@ -18,7 +18,7 @@ export function validateReceiptDraft(value: ReceiptDraft) {
   const date = typeof value?.date === 'string' ? new Date(`${value.date}T00:00:00.000Z`) : null
   const validDate = date && !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value.date
   if (!validDate || typeof value.accountId !== 'string' || !value.accountId
-      || !Number.isFinite(value.amount) || value.amount <= 0 || value.amount > 1_000_000
+      || !Number.isFinite(value.amount) || value.amount <= 0 || value.amount > 1_000_000 || Number(value.amount.toFixed(2)) !== value.amount
       || typeof value.note !== 'string' || value.note.length > 240) {
     throw createError({ statusCode: 400, statusMessage: 'Проверьте счёт, дату, сумму и заметку.' })
   }
@@ -31,8 +31,8 @@ const projection = `SELECT r.id, r.date, r.account_id AS accountId, r.amount, r.
 const list = database.prepare(`${projection} ORDER BY r.date DESC, r.created_at DESC, r.rowid DESC`)
 const find = database.prepare(`${projection} WHERE r.id = ?`)
 const insert = database.prepare('INSERT INTO receipts (id, account_id, date, amount, note) VALUES (?, ?, ?, ?, ?)')
-const addBalance = database.prepare('UPDATE accounts SET amount = amount + ? WHERE id = ?')
-const subtractBalance = database.prepare('UPDATE accounts SET amount = amount - ? WHERE id = ?')
+const addBalance = database.prepare('UPDATE accounts SET amount = (CAST(ROUND(amount*100) AS INTEGER) + CAST(ROUND(?*100) AS INTEGER))/100.0 WHERE id = ?')
+const subtractBalance = database.prepare('UPDATE accounts SET amount = (CAST(ROUND(amount*100) AS INTEGER) - CAST(ROUND(?*100) AS INTEGER))/100.0 WHERE id = ?')
 
 export function getReceipts(from?: string, to?: string): ReceiptRecord[] {
   const rows = list.all() as ReceiptRecord[]

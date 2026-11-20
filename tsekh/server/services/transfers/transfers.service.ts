@@ -22,7 +22,7 @@ export function validateTransferDraft(value: TransferDraft) {
   if (!validDate || typeof value.sourceAccountId !== 'string' || !value.sourceAccountId
       || typeof value.targetAccountId !== 'string' || !value.targetAccountId
       || value.sourceAccountId === value.targetAccountId
-      || !Number.isFinite(value.amount) || value.amount <= 0 || value.amount > 1_000_000
+      || !Number.isFinite(value.amount) || value.amount <= 0 || value.amount > 1_000_000 || Number(value.amount.toFixed(2)) !== value.amount
       || typeof value.note !== 'string' || value.note.length > 240) {
     throw createError({ statusCode: 400, statusMessage: 'Проверьте счета, дату, сумму и заметку.' })
   }
@@ -39,8 +39,8 @@ const find = database.prepare(`${projection} WHERE t.id = ?`)
 const insert = database.prepare(`INSERT INTO transfers
   (id, source_account_id, target_account_id, date, amount, note) VALUES (?, ?, ?, ?, ?, ?)`)
 const accountExists = database.prepare('SELECT 1 FROM accounts WHERE id = ?')
-const addBalance = database.prepare('UPDATE accounts SET amount = amount + ? WHERE id = ?')
-const subtractBalance = database.prepare('UPDATE accounts SET amount = amount - ? WHERE id = ? AND amount >= ?')
+const addBalance = database.prepare('UPDATE accounts SET amount = (CAST(ROUND(amount*100) AS INTEGER) + CAST(ROUND(?*100) AS INTEGER))/100.0 WHERE id = ?')
+const subtractBalance = database.prepare('UPDATE accounts SET amount = (CAST(ROUND(amount*100) AS INTEGER) - CAST(ROUND(?*100) AS INTEGER))/100.0 WHERE id = ? AND ROUND(amount*100) >= ROUND(?*100)')
 
 function validateAccounts(draft: TransferDraft) {
   if (!accountExists.get(draft.sourceAccountId) || !accountExists.get(draft.targetAccountId)) {

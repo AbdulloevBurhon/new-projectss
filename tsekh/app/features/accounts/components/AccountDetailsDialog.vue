@@ -14,18 +14,20 @@ const retry = ref(0)
 
 const columns = [
   { key: 'date', label: 'Дата' },
-  { key: 'description', label: 'На что ушли деньги' },
+  { key: 'description', label: 'Операция' },
   { key: 'quantity', label: 'Количество', align: 'right' as const },
   { key: 'unitPrice', label: 'Цена закупки', align: 'right' as const },
+  { key: 'income', label: 'Поступление', align: 'right' as const },
+  { key: 'sale', label: 'Продажа', align: 'right' as const },
   { key: 'amount', label: 'Списано', align: 'right' as const },
 ]
-const labels = { purchase: 'Закупка', expense: 'Списание', transfer: 'Перевод' }
+const labels = { purchase: 'Закупка', expense: 'Списание', transfer: 'Перевод', 'transfer-in': 'Входящий перевод', sale: 'Продажа', receipt: 'Поступление' }
 const money = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 6 })
 const dateTime = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
 
 function formatDate(row: AccountOutflow) {
-  if (row.kind === 'purchase') return dateTime.format(new Date(row.date))
+  if (row.kind === 'purchase' || row.kind === 'sale') return dateTime.format(new Date(row.date))
   return row.date.split('-').reverse().join('.')
 }
 
@@ -60,7 +62,7 @@ watch([() => props.account.id, retry], async ([id], _, onCleanup) => {
       </div>
       <template v-else-if="details">
         <p class="text-sm text-muted-foreground">Баланс <strong class="text-foreground">{{ money.format(details.account.amount) }} сом</strong></p>
-        <DataTable :columns="columns" :rows="details.outflows" empty-text="По этому счёту ещё не было расходов">
+        <DataTable :columns="columns" :rows="details.outflows" empty-text="По этому счёту ещё не было операций">
           <template #cell-date="{ row }">{{ formatDate(row) }}</template>
           <template #cell-description="{ row }">
             <span class="block whitespace-normal">{{ row.description }}</span>
@@ -74,7 +76,9 @@ watch([() => props.account.id, retry], async ([id], _, onCleanup) => {
             <template v-else>—</template>
           </template>
           <template #cell-unitPrice="{ row }">{{ row.unitPrice === null ? '—' : `${money.format(row.unitPrice)} сом/${row.unit}` }}</template>
-          <template #cell-amount="{ row }"><span class="font-medium text-destructive">{{ money.format(row.amount) }} сом</span></template>
+          <template #cell-income="{row}">{{(row.kind==='receipt' || row.kind==='transfer-in') ? money.format(row.amount)+' сом' : '—'}}</template>
+          <template #cell-sale="{row}">{{row.kind==='sale' ? money.format(row.amount)+' сом' : '—'}}</template>
+          <template #cell-amount="{ row }"><span v-if="row.amount<0" class="font-medium text-destructive">{{ money.format(row.amount) }} сом</span><span v-else>—</span></template>
         </DataTable>
       </template>
     </DialogContent>

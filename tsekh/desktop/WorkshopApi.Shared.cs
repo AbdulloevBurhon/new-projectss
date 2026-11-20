@@ -48,7 +48,7 @@ internal sealed partial class WorkshopApi
     private static double RequiredAmount(Dictionary<string, object> body)
     {
         double amount = Number(body, "amount");
-        if (double.IsNaN(amount) || double.IsInfinity(amount) || amount <= 0 || amount > 1000000)
+        if (double.IsNaN(amount) || double.IsInfinity(amount) || amount <= 0 || amount > 1000000 || Math.Round(amount, 2) != amount)
             throw new ApiError(400, "Сумма должна быть больше нуля и не превышать 1 000 000.");
         return amount;
     }

@@ -59,14 +59,15 @@ export function useArchiveFolders(product: ProductId) {
   return { localFolder, secondaryFolder, chooseFolder }
 }
 
-export async function writeArchiveToFolders(product: ProductId, blob: Blob, fileName: string) {
+export async function writeArchiveToFolders(product: ProductId, blob: Blob, fileName: string, targets: FolderKind[] = kinds) {
   const desktop = desktopBackup()
   if (desktop) {
     const archive = await blob.text()
-    return Promise.allSettled(kinds.map(kind => desktop.write(kind, archive)))
+    return Promise.allSettled(targets.map(kind => desktop.write(kind, archive)))
   }
-  const folders = await Promise.all(kinds.map(kind => readBackupValue<WritableFolder>(product, kind)))
-  return Promise.allSettled(folders.filter(folder => folder !== undefined).map(async (folder) => {
+  const folders = await Promise.all(targets.map(kind => readBackupValue<WritableFolder>(product, kind)))
+  return Promise.allSettled(folders.map(async (folder) => {
+    if(!folder)return false
     if (await folder.queryPermission(permission) !== 'granted') {
       throw new Error(`Выберите папку «${folder.name}» повторно, чтобы разрешить запись.`)
     }
@@ -75,6 +76,7 @@ export async function writeArchiveToFolders(product: ProductId, blob: Blob, file
     try {
       await writer.write(blob)
       await writer.close()
+      return true
     } catch (error) {
       await writer.abort().catch(() => {})
       throw new Error(`Не удалось записать копию в папку «${folder.name}».`, { cause: error })

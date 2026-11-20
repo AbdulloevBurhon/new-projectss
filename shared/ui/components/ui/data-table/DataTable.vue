@@ -16,7 +16,9 @@ const props = withDefaults(defineProps<{
   pageSizeOptions: () => [10, 25, 50],
 })
 const page = ref(1)
+const emit = defineEmits<{ 'update:pageSize': [size: number] }>()
 const pageSize = ref(props.pageSizeOptions[0] ?? 10)
+watch(pageSize, size => emit('update:pageSize', size))
 const pageCount = computed(() => Math.max(1, Math.ceil(props.rows.length / pageSize.value)))
 const visibleRows = computed(() => props.rows.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
 const firstIndex = computed(() => (page.value - 1) * pageSize.value)

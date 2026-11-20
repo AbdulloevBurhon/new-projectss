@@ -12,13 +12,15 @@ interface Backup {
   createdAt: string
   blob: Blob
   fileName: string
+  local?: string
+  secondary?: string
   cloudUploaded: boolean
 }
 
 export const scheduledArchiveKey: InjectionKey<ReturnType<typeof useScheduledArchive>> = Symbol('scheduledArchive')
 
 export function useScheduledArchive(product: ProductId, apiBase: string, canRun: () => boolean,
-  createArchive: () => ReturnType<typeof createProductArchive> | Promise<ReturnType<typeof createProductArchive>> = () => createProductArchive(product)) {
+  createArchive: () => ReturnType<typeof createProductArchive> | Promise<ReturnType<typeof createProductArchive>> = () => createProductArchive(product), cloudAllowed:()=>boolean = ()=>true) {
   const schedule = ref<SavedSchedule>()
   const last = ref<Backup>()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -30,7 +32,8 @@ export function useScheduledArchive(product: ProductId, apiBase: string, canRun:
     const file = new File([backup.blob], backup.fileName, { type: 'application/json' })
     try {
       await uploadProductArchive(apiBase, file, product, true, AbortSignal.timeout(20_000))
-      await writeBackupValues(product, { latest: { ...backup, cloudUploaded: true } })
+      backup.cloudUploaded=true
+      await writeBackupValues(product,{latest:backup});last.value={...backup}
       reportedCloudFailure = false
     } catch (error) {
       if (!reportedCloudFailure) {
@@ -52,7 +55,7 @@ export function useScheduledArchive(product: ProductId, apiBase: string, canRun:
       const slot = current ? dueBackupSlot(new Date(), current) : undefined
       let previous = await readBackupValue<Backup>(product, 'latest')
       last.value = previous
-      let local: Promise<void> | undefined
+      const targets=['local','secondary'] as const
       if (slot !== undefined && (!previous || previous.slot < slot)) {
         const createdAt = new Date().toISOString()
         const { blob } = await createArchive()
@@ -60,17 +63,31 @@ export function useScheduledArchive(product: ProductId, apiBase: string, canRun:
         previous = { slot, createdAt, blob, fileName, cloudUploaded: false }
         await writeBackupValues(product, { latest: previous })
         last.value = previous
-        local = writeArchiveToFolders(product, blob, fileName).then((results) => {
-          for (const result of results) {
-            if (result.status === 'rejected') toast.error(String(result.reason?.message ?? result.reason))
+      }
+      if(previous && current && current.intervalMinutes>0){
+        const latest=previous
+        for(const kind of targets){
+          const key='retry:'+kind
+          const pending=await readBackupValue<Backup>(product,key)
+          if(latest[kind]==='Сохранено' && !pending)continue
+          const copies=pending && pending.slot!==latest.slot?[pending,latest]:[latest]
+          for(const copy of copies){
+            const [result]=await writeArchiveToFolders(product,copy.blob,copy.fileName,[kind])
+            if(result.status==='rejected'){
+              latest[kind]='Ожидает повторной записи'
+              await writeBackupValues(product,{[key]:copy})
+              break
+            }
+            latest[kind]=result.value?'Сохранено':'Папка не выбрана'
+            await writeBackupValues(product,{[key]:undefined})
           }
-        })
+        }
+        await writeBackupValues(product,{latest});last.value={...latest}
       }
       const cloud = previous && current && current.intervalMinutes > 0 && current.cloudCopy
-        && previous.slot >= current.startsAt && !previous.cloudUploaded && navigator.onLine
+        && cloudAllowed() && previous.slot >= current.startsAt && !previous.cloudUploaded && navigator.onLine
         ? sendCloud(previous) : undefined
-      const [localResult] = await Promise.allSettled([local, cloud])
-      if (localResult.status === 'rejected') toast.error('Не удалось записать копии в выбранные папки.')
+      await cloud
     }
     try {
       if (navigator.locks) await navigator.locks.request(`obshaya-${product}-backup`, backup)

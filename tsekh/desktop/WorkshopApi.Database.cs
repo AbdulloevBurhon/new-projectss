@@ -46,6 +46,12 @@ CREATE TABLE IF NOT EXISTS transfers (id TEXT PRIMARY KEY, source_account_id TEX
             command.ExecuteNonQuery();
             InitializeProductBarcode(connection);
             InitializeStockReceipts(connection);
+            using (var migration=connection.BeginTransaction())
+            using (var schema=new SQLiteCommand(SaleSql["schema"],connection,migration))
+            {
+                schema.ExecuteNonQuery();
+                migration.Commit();
+            }
         }
     }
 

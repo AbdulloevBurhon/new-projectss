@@ -1,8 +1,8 @@
 import database from '../../database/accounts/accounts.database'
-import '../warehouse/stock-receipts.service'
+import '../sales/sales.service'
 import { barcodeMaxLength } from '../../../endpoints/warehouse/products/products.types'
 
-const tables = ['accounts', 'warehouses', 'products', 'receipts', 'expenses', 'transfers', 'stock_receipts'] as const
+const tables = ['accounts', 'warehouses', 'products', 'receipts', 'expenses', 'transfers', 'stock_receipts','clients','sales','sale_lines','stock_movements'] as const
 type Column = { name: string; type: string; notnull: number; pk: number }
 const schema = tables.map(table => {
   const columns = database.pragma(`table_info(${table})`) as Column[]
@@ -66,7 +66,11 @@ const replaceDatabase = database.transaction((snapshot: ReturnType<typeof valida
 
 export function importDatabase(value: unknown) {
   if (!record(value) || value.version !== 1 || !record(value.tables)) throw invalidArchive()
-  const source = value.tables
+  const source = {...value.tables}
+  if (Object.keys(source).length===7 && tables.slice(0,7).every(t=>Object.hasOwn(source,t))) {
+    for(const t of tables.slice(7)) source[t]=[]
+  }
+  if(Object.keys(source).length===10 && tables.slice(0,10).every(t=>Object.hasOwn(source,t))) source.stock_movements=[]
   if (Object.keys(source).length !== tables.length) throw invalidArchive()
   const snapshot = schema.map(({ table, columns }) => validateRows(source[table], columns, table))
   try { replaceDatabase.immediate(snapshot) }

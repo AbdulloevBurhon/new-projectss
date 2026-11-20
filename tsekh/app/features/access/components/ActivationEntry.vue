@@ -23,7 +23,7 @@ function reportError(cause: unknown, fallback: string) {
 
 async function refreshStatus() {
   try {
-    const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId(product)}`)
+    const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId(product)}`, {signal:AbortSignal.timeout(4500)})
     lastError = ''
     if (status.productId !== product) throw new Error('Заявка относится к другому направлению.')
     initialPin.value = status.initialPin ?? ''

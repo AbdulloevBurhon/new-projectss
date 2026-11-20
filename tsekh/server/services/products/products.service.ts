@@ -11,6 +11,12 @@ const update = database.prepare(`UPDATE products SET name=@name,unit=@unit,conte
 const remove = database.prepare('DELETE FROM products WHERE id=?')
 const updateBarcode = database.prepare('UPDATE products SET barcode=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
 const count = database.prepare('SELECT COUNT(*) AS total FROM products')
+const findBarcode = database.prepare('SELECT id FROM products WHERE barcode=? COLLATE NOCASE AND id<>? LIMIT 1')
+export const duplicateBarcodeCode = 'PRODUCT_BARCODE_ALREADY_EXISTS'
+
+function ensureBarcodeAvailable(barcode: string | null | undefined, id: string) {
+  if (barcode && findBarcode.get(barcode, id)) throw new Error(duplicateBarcodeCode)
+}
 
 function record(row: unknown): Product {
   const value = row as Product & { contentUnit: ProductUnit | null; quantityPerPiece: number | null }
@@ -43,18 +49,29 @@ export function validateProductDraft(value: unknown): Omit<Product, 'id'> {
 export function getProducts(): Product[] { return (list.all() as Product[]).map(record) }
 export function createProduct(fields: Omit<Product, 'id'>): Product {
   const id = randomUUID()
-  insert.run({ id, name: fields.name, unit: fields.unit, barcode: fields.barcode ?? null, contentUnit: fields.contentUnit ?? null, quantityPerPiece: fields.quantityPerPiece ?? null })
+  database.transaction(() => {
+    ensureBarcodeAvailable(fields.barcode, id)
+    insert.run({ id, name: fields.name, unit: fields.unit, barcode: fields.barcode ?? null, contentUnit: fields.contentUnit ?? null, quantityPerPiece: fields.quantityPerPiece ?? null })
+  }).immediate()
   return record(find.get(id))
 }
 export function updateProduct(id: string, fields: Omit<Product, 'id'>): Product | undefined {
-  if (!update.run({ id, name: fields.name, unit: fields.unit, barcode: fields.barcode ?? null, hasBarcode: Number(fields.barcode !== undefined),
-    contentUnit: fields.contentUnit ?? null, quantityPerPiece: fields.quantityPerPiece ?? null }).changes) return undefined
+  const changes = database.transaction(() => {
+    ensureBarcodeAvailable(fields.barcode, id)
+    return update.run({ id, name: fields.name, unit: fields.unit, barcode: fields.barcode ?? null, hasBarcode: Number(fields.barcode !== undefined),
+      contentUnit: fields.contentUnit ?? null, quantityPerPiece: fields.quantityPerPiece ?? null }).changes
+  }).immediate()
+  if (!changes) return undefined
   return record(find.get(id))
 }
 export function deleteProduct(id: string) { return remove.run(id).changes > 0 }
 
 export function updateProductBarcode(id: string, barcode: string | null): Product | undefined {
-  if (!updateBarcode.run(barcode, id).changes) return undefined
+  const changes = database.transaction(() => {
+    ensureBarcodeAvailable(barcode, id)
+    return updateBarcode.run(barcode, id).changes
+  }).immediate()
+  if (!changes) return undefined
   return record(find.get(id))
 }
 

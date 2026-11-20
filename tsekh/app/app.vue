@@ -2,6 +2,7 @@
 import { ClientMessages, SidebarLayout, Toaster, scheduledArchiveKey, toast, useScheduledArchive } from '@obshaya/ui'
 import { clientApi, getClientPin, installationId, temporaryPinExpired, type ActivationStatus } from '@obshaya/contracts/client-api'
 import { onBeforeUnmount, onMounted, provide } from 'vue'
+import { forgetOfflinePin } from './features/access/composables/offlinePin'
 import { usePinAccess } from './features/access/composables/usePinAccess'
 import { reportInstalledUpdate } from '../endpoints/settings/updates/updates.service'
 import { createWorkshopArchive } from '../endpoints/settings/archive/archive.service'
@@ -18,13 +19,14 @@ const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
 provide(scheduledArchiveKey, useScheduledArchive('tsekh', apiBase, () => (
   license.value === '1' && access.value === '1' && route.path !== '/pin'
   && !route.path.startsWith('/activation') && !temporaryPinExpired() && !!getClientPin()
-), createWorkshopArchive))
+), createWorkshopArchive,()=>cloudArchiveAllowed.value))
 let licenseTimer: ReturnType<typeof setInterval> | undefined
 const items = [
   { label: 'Главная', to: '/', icon: 'home' as const },
   { label: 'Склады', to: '/warehouses', icon: 'warehouse' as const },
   { label: 'Счёт', to: '/accounts', icon: 'account' as const },
   { label: 'Сотрудники', to: '/workers', icon: 'workers' as const },
+  { label: 'Клиенты', to: '/clients', icon: 'clients' as const },
   { label: 'Продажа', to: '/sales', icon: 'sales' as const },
   { label: 'Отчёты', to: '/reports', icon: 'reports' as const },
   { label: 'Итоги', to: '/summary', icon: 'summary' as const },
@@ -42,17 +44,22 @@ function logout() {
 }
 
 function handlePinRejected() {
+  forgetOfflinePin()
   toast.error('PIN-код больше не действует. Войдите снова.')
   logout()
 }
 
 async function refreshLicense() {
+  if (license.value==='1' && !(Date.parse(licenseUntil.value??'')>Date.now())) {
+    forgetOfflinePin();license.value=null;licenseUntil.value=null;lock();await router.push('/activation');return
+  }
   if (temporaryPinExpired()) { lock(); await router.push('/pin'); return }
   if (!license.value || !navigator.onLine) return
   try {
-    const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId('tsekh')}`)
+    const status = await clientApi<ActivationStatus>(apiBase, `/api/client/activation/${installationId('tsekh')}`, { signal: AbortSignal.timeout(5000) })
     cloudArchiveAllowed.value = status.cloudArchiveAllowed == null ? true : Boolean(status.cloudArchiveAllowed)
     if (status.licenseStatus !== 'active' || status.productId !== 'tsekh') {
+      forgetOfflinePin()
       const disabled = status.licenseStatus === 'disabled' && status.productId === 'tsekh'
       license.value = null; licenseUntil.value = null; licenseNotice.value = disabled ? 'disabled' : null
       lock(); await router.push(disabled ? '/pin?notice=disabled' : '/activation')

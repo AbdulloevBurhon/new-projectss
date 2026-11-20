@@ -34,20 +34,33 @@ internal sealed partial class WorkshopApi
     {
         string id = Guid.NewGuid().ToString("D");
         using (SQLiteConnection connection = Open())
-        using (SQLiteCommand command = new SQLiteCommand("INSERT INTO products (id,name,unit,content_unit,quantity_per_piece,barcode) VALUES (@id,@name,@unit,@content,@quantity,@barcode)", connection))
         {
-            BindProduct(command, id, fields); command.ExecuteNonQuery(); return GetProduct(connection, id);
+            using (SQLiteTransaction transaction = connection.BeginTransaction())
+            {
+                EnsureProductBarcodeAvailable(connection, transaction, fields.Barcode, id);
+                using (SQLiteCommand command = new SQLiteCommand("INSERT INTO products (id,name,unit,content_unit,quantity_per_piece,barcode) VALUES (@id,@name,@unit,@content,@quantity,@barcode)", connection, transaction))
+                { BindProduct(command, id, fields); command.ExecuteNonQuery(); }
+                transaction.Commit();
+            }
+            return GetProduct(connection, id);
         }
     }
 
     private object UpdateProduct(string id, ProductData fields)
     {
         using (SQLiteConnection connection = Open())
-        using (SQLiteCommand command = new SQLiteCommand("UPDATE products SET name=@name,unit=@unit,content_unit=@content,quantity_per_piece=@quantity,barcode=CASE WHEN @hasBarcode THEN @barcode ELSE barcode END,updated_at=CURRENT_TIMESTAMP WHERE id=@id", connection))
         {
-            BindProduct(command, id, fields);
-            command.Parameters.AddWithValue("@hasBarcode", fields.HasBarcode ? 1 : 0);
-            if (command.ExecuteNonQuery() == 0) throw new ApiError(404, "Товар не найден.");
+            using (SQLiteTransaction transaction = connection.BeginTransaction())
+            {
+                EnsureProductBarcodeAvailable(connection, transaction, fields.HasBarcode ? fields.Barcode : null, id);
+                using (SQLiteCommand command = new SQLiteCommand("UPDATE products SET name=@name,unit=@unit,content_unit=@content,quantity_per_piece=@quantity,barcode=CASE WHEN @hasBarcode THEN @barcode ELSE barcode END,updated_at=CURRENT_TIMESTAMP WHERE id=@id", connection, transaction))
+                {
+                    BindProduct(command, id, fields);
+                    command.Parameters.AddWithValue("@hasBarcode", fields.HasBarcode ? 1 : 0);
+                    if (command.ExecuteNonQuery() == 0) throw new ApiError(404, "Товар не найден.");
+                }
+                transaction.Commit();
+            }
             return GetProduct(connection, id);
         }
     }
@@ -55,11 +68,18 @@ internal sealed partial class WorkshopApi
     private object UpdateProductBarcode(string id, string barcode)
     {
         using (SQLiteConnection connection = Open())
-        using (SQLiteCommand command = new SQLiteCommand("UPDATE products SET barcode=@barcode,updated_at=CURRENT_TIMESTAMP WHERE id=@id", connection))
         {
-            command.Parameters.AddWithValue("@id", id);
-            command.Parameters.AddWithValue("@barcode", (object)barcode ?? DBNull.Value);
-            if (command.ExecuteNonQuery() == 0) throw new ApiError(404, "Товар не найден.");
+            using (SQLiteTransaction transaction = connection.BeginTransaction())
+            {
+                EnsureProductBarcodeAvailable(connection, transaction, barcode, id);
+                using (SQLiteCommand command = new SQLiteCommand("UPDATE products SET barcode=@barcode,updated_at=CURRENT_TIMESTAMP WHERE id=@id", connection, transaction))
+                {
+                    command.Parameters.AddWithValue("@id", id);
+                    command.Parameters.AddWithValue("@barcode", (object)barcode ?? DBNull.Value);
+                    if (command.ExecuteNonQuery() == 0) throw new ApiError(404, "Товар не найден.");
+                }
+                transaction.Commit();
+            }
             return GetProduct(connection, id);
         }
     }
