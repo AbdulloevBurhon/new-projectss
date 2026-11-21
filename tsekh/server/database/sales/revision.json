@@ -1,0 +1,81 @@
+{
+  "revisionSchema": [
+    "CREATE TABLE IF NOT EXISTS stock_revisions (",
+    "id TEXT PRIMARY KEY, warehouse TEXT NOT NULL, warehouse_name TEXT NOT NULL, created INTEGER NOT NULL,",
+    "version INTEGER NOT NULL DEFAULT 0, closed INTEGER, status TEXT NOT NULL DEFAULT 'draft'",
+    "CHECK(status IN ('draft','posted','cancelled')), actor TEXT, employee TEXT);",
+    "CREATE UNIQUE INDEX IF NOT EXISTS stock_revision_draft ON stock_revisions(warehouse) WHERE status='draft';",
+    "CREATE INDEX IF NOT EXISTS stock_revision_warehouse ON stock_revisions(warehouse,created);",
+    "CREATE TABLE IF NOT EXISTS stock_revision_lines (",
+    "revision TEXT NOT NULL REFERENCES stock_revisions(id), lot TEXT NOT NULL CHECK(json_valid(lot)),",
+    "name TEXT NOT NULL, book REAL NOT NULL, actual REAL NOT NULL CHECK(actual>=0),",
+    "stale INTEGER NOT NULL DEFAULT 0 CHECK(stale IN (0,1)), PRIMARY KEY(revision,lot));",
+    "CREATE INDEX IF NOT EXISTS stock_revision_lines_lot ON stock_revision_lines(lot);",
+    "CREATE TRIGGER IF NOT EXISTS revision_receipt_insert AFTER INSERT ON stock_receipts WHEN NEW.status='posted' BEGIN",
+    "UPDATE stock_revision_lines SET stale=1 WHERE lot=json_array(NEW.warehouse_id,NEW.product_id,NEW.unit,NEW.content_unit,NEW.quantity_per_piece)",
+    "AND revision IN (SELECT id FROM stock_revisions WHERE status='draft'); END;",
+    "CREATE TRIGGER IF NOT EXISTS revision_receipt_delete AFTER DELETE ON stock_receipts WHEN OLD.status='posted' BEGIN",
+    "UPDATE stock_revision_lines SET stale=1 WHERE lot=json_array(OLD.warehouse_id,OLD.product_id,OLD.unit,OLD.content_unit,OLD.quantity_per_piece)",
+    "AND revision IN (SELECT id FROM stock_revisions WHERE status='draft'); END;",
+    "CREATE TRIGGER IF NOT EXISTS revision_receipt_update AFTER UPDATE ON stock_receipts",
+    "WHEN (OLD.status='posted' OR NEW.status='posted') AND (OLD.status IS NOT NEW.status OR OLD.quantity IS NOT NEW.quantity",
+    "OR OLD.warehouse_id IS NOT NEW.warehouse_id OR OLD.product_id IS NOT NEW.product_id OR OLD.unit IS NOT NEW.unit",
+    "OR OLD.content_unit IS NOT NEW.content_unit OR OLD.quantity_per_piece IS NOT NEW.quantity_per_piece) BEGIN",
+    "UPDATE stock_revision_lines SET stale=1 WHERE lot IN (",
+    "json_array(OLD.warehouse_id,OLD.product_id,OLD.unit,OLD.content_unit,OLD.quantity_per_piece),",
+    "json_array(NEW.warehouse_id,NEW.product_id,NEW.unit,NEW.content_unit,NEW.quantity_per_piece))",
+    "AND revision IN (SELECT id FROM stock_revisions WHERE status='draft'); END;",
+    "CREATE TRIGGER IF NOT EXISTS revision_sale_insert AFTER INSERT ON sale_lines BEGIN",
+    "UPDATE stock_revision_lines SET stale=1 WHERE lot=NEW.lot AND revision IN (SELECT id FROM stock_revisions WHERE status='draft'); END;",
+    "CREATE TRIGGER IF NOT EXISTS revision_movement_insert AFTER INSERT ON stock_movements BEGIN",
+    "UPDATE stock_revision_lines SET stale=1 WHERE (lot=NEW.lot OR (NEW.target IS NOT NULL AND lot=json_set(NEW.lot,'$[0]',NEW.target)))",
+    "AND revision IN (SELECT id FROM stock_revisions WHERE status='draft'); END;"
+  ],
+  "revisionHeaders": [
+    "SELECT id, status, created, closed, actor, version FROM stock_revisions WHERE warehouse=@warehouse ORDER BY created DESC, id DESC"
+  ],
+  "revisionStart": [
+    "INSERT INTO stock_revisions(id,warehouse,warehouse_name,created)",
+    "SELECT @id,id,name,@now FROM warehouses WHERE id=@warehouse",
+    "ON CONFLICT DO NOTHING"
+  ],
+  "revisionRows": [
+    "WITH current AS MATERIALIZED (SELECT * FROM sale_stock WHERE warehouse=@warehouse AND @draft=1),",
+    "counted AS (SELECT * FROM stock_revision_lines WHERE revision=@id),",
+    "lots AS (SELECT id lot FROM current UNION SELECT lot FROM counted)",
+    "SELECT k.lot id,coalesce(c.name,p.name,s.name) name,p.barcode,json_extract(k.lot,'$[2]') unit,",
+    "json_extract(k.lot,'$[3]') contentUnit,coalesce(json_extract(k.lot,'$[4]'),1) factor,",
+    "s.stock current,c.book,c.actual,CASE WHEN @draft=1 AND c.lot IS NOT NULL",
+    "AND (c.stale=1 OR s.stock IS NOT c.book) THEN 1 ELSE 0 END stale",
+    "FROM lots k LEFT JOIN current s ON s.id=k.lot LEFT JOIN counted c ON c.lot=k.lot",
+    "LEFT JOIN products p ON p.id=json_extract(k.lot,'$[1]') ORDER BY name,k.lot"
+  ],
+  "revisionSave": [
+    "INSERT INTO stock_revision_lines(revision,lot,name,book,actual,stale)",
+    "SELECT @id,s.id,coalesce(p.name,s.name),s.stock,round(@actual/s.factor,9),0",
+    "FROM sale_stock s LEFT JOIN products p ON p.id=s.productId",
+    "WHERE s.id=@lot AND s.warehouse=@warehouse AND s.stock=@book",
+    "AND (coalesce(s.contentUnit,s.unit) NOT IN ('шт','уп') OR @actual=round(@actual))",
+    "AND @actual/s.factor<=1000000000",
+    "ON CONFLICT(revision,lot) DO UPDATE SET name=excluded.name,book=excluded.book,actual=excluded.actual,stale=0"
+  ],
+  "revisionClear": [
+    "DELETE FROM stock_revision_lines WHERE revision=@id AND lot=@lot"
+  ],
+  "revisionTouch": [
+    "UPDATE stock_revisions SET version=version+1 WHERE id=@id"
+  ],
+  "revisionCounts": [
+    "SELECT count(*) counted, coalesce(max(c.stale=1 OR s.stock IS NOT c.book),0) stale",
+    "FROM stock_revision_lines c LEFT JOIN sale_stock s ON s.id=c.lot WHERE c.revision=@id"
+  ],
+  "revisionClose": [
+    "UPDATE stock_revisions SET status=@status,closed=@now,actor=@actor,employee=@employee,version=version+1 WHERE id=@id"
+  ],
+  "revisionMovements": [
+    "INSERT INTO stock_movements(id,lot,source,target,qty,name,price,created)",
+    "SELECT 'revision:'||c.revision||':'||c.lot,c.lot,s.warehouse,NULL,round(c.actual-c.book,9),",
+    "c.name,s.price/s.factor,@now FROM stock_revision_lines c JOIN sale_stock s ON s.id=c.lot",
+    "WHERE c.revision=@id AND c.actual<>c.book"
+  ]
+}

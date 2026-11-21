@@ -1,6 +1,3 @@
-# workers feature
+# Инструкция раздела «Сотрудники»
 
-- components/: UI owned by this section.
-- composables/: section-specific UI behavior and orchestration.
-- Keep API calls in 	sekh/endpoints; do not import another feature's internals.
-- Keep files focused and under 120 lines; split by responsibility when needed.
+Маршрут, права, локальный сеанс и проверка отчёта описаны в [основной инструкции раздела](../INSTRUCTION.md).

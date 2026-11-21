@@ -1,8 +1,10 @@
 import { getReceipts } from '../../../services/receipts/receipts.service'
 
+import { onlyResources } from '../../../services/workers/employee-scope'
+
 export default defineEventHandler((event) => {
   const query = getQuery(event)
-  return getReceipts(readDate(query.from), readDate(query.to))
+  return onlyResources(getReceipts(readDate(query.from), readDate(query.to)), event.context.employee?.resources, 'accounts', 'accountId')
 })
 
 function readDate(value: unknown) {

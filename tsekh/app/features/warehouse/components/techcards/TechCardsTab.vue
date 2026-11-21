@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEmployeeAccess } from '../../../workers/composables/useEmployeeAccess'
 import { computed, ref } from 'vue'
 import { Button,DataTable,Input,TabsContent,toast } from '@obshaya/ui'
 import { Info,Plus,Pencil,Trash2 } from '@lucide/vue'
@@ -31,15 +32,18 @@ function openTechCardForm(card: TechCard | null = null) {
 function openTechCardInfo(card: TechCard) { infoTechCard.value = card; techCardInfoOpen.value = true }
 function openTechCardDelete(card: TechCard) { deletingTechCard.value = card; techCards.state.error = ''; deleteTechCardOpen.value = true }
 async function saveTechCard(draft: TechCardDraft) {
+  if (selectedTechCard.value && !can('warehouses.edit')) return
   if (!await techCards.save(draft, products.state.rows, selectedTechCard.value?.id)) return
   techCardDialogOpen.value = false
   toast.success(selectedTechCard.value ? 'Техкарта обновлена.' : 'Техкарта добавлена.')
 }
 async function confirmDeleteTechCard() {
-  if (!deletingTechCard.value || !await techCards.remove(deletingTechCard.value.id)) return
+  if (!can('warehouses.delete') || !deletingTechCard.value || !await techCards.remove(deletingTechCard.value.id)) return
   deleteTechCardOpen.value = false
   toast.success('Техкарта удалена.')
 }
+
+const { can } = useEmployeeAccess()
 </script>
 
 <template>
@@ -56,13 +60,13 @@ async function confirmDeleteTechCard() {
       <template #cell-actions="{ row }">
         <div class="flex justify-end gap-1">
           <Button size="icon" variant="ghost" :aria-label="`Информация о техкарте ${row.name}`" @click="openTechCardInfo(row)"><Info class="size-4 text-sky-600" /></Button>
-          <Button size="icon" variant="ghost" :aria-label="`Изменить техкарту ${row.name}`" @click="openTechCardForm(row)"><Pencil class="size-4 text-blue-600" /></Button>
-          <Button size="icon" variant="ghost" :aria-label="`Удалить техкарту ${row.name}`" @click="openTechCardDelete(row)"><Trash2 class="size-4 text-destructive" /></Button>
+          <Button v-if="can('warehouses.edit')" size="icon" variant="ghost" :aria-label="`Изменить техкарту ${row.name}`" @click="openTechCardForm(row)"><Pencil class="size-4 text-blue-600" /></Button>
+          <Button v-if="can('warehouses.delete')" size="icon" variant="ghost" :aria-label="`Удалить техкарту ${row.name}`" @click="openTechCardDelete(row)"><Trash2 class="size-4 text-destructive" /></Button>
         </div>
       </template>
     </DataTable>
   </TabsContent>
-    <TechCardFormDialog v-model:open="techCardDialogOpen" :card="selectedTechCard" :products="products.state.rows" :saving="techCards.state.pending" :error="techCards.state.error" @save="saveTechCard" />
+    <TechCardFormDialog :open="techCardDialogOpen && (!selectedTechCard || can('warehouses.edit'))" @update:open="techCardDialogOpen = $event" :card="selectedTechCard" :products="products.state.rows" :saving="techCards.state.pending" :error="techCards.state.error" @save="saveTechCard" />
     <TechCardInfoDialog v-model:open="techCardInfoOpen" :card="infoTechCard" />
-    <DeleteTechCardDialog v-model:open="deleteTechCardOpen" :name="deletingTechCard?.name || ''" :pending="techCards.state.pending" :error="techCards.state.error" @confirm="confirmDeleteTechCard" />
+    <DeleteTechCardDialog :open="deleteTechCardOpen && can('warehouses.delete')" @update:open="deleteTechCardOpen = $event" :name="deletingTechCard?.name || ''" :pending="techCards.state.pending" :error="techCards.state.error" @confirm="confirmDeleteTechCard" />
 </template>

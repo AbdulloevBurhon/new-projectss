@@ -1,4 +1,4 @@
-import type { StockReceipt, StockReceiptAmounts, StockReceiptDraft, StockReceiptsResult } from './types'
+import type { PostedStockReceiptEdit, StockReceipt, StockReceiptAmounts, StockReceiptDraft, StockReceiptsResult } from './types'
 
 const path = '/api/stock-receipts'
 
@@ -14,6 +14,14 @@ export function updateStockReceipt(id: string, draft: StockReceiptAmounts) {
 
 export function discardStockReceipt(id: string) {
   return $fetch(`${path}/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function editPostedStockReceipt(id: string, amounts: PostedStockReceiptEdit) {
+  return $fetch<StockReceipt>(`${path}/${encodeURIComponent(id)}/posted`, { method: 'PATCH', body: amounts })
+}
+
+export function deletePostedStockReceipt(id: string) {
+  return $fetch<{ success: boolean }>(`${path}/${encodeURIComponent(id)}/posted`, { method: 'DELETE' })
 }
 
 export function stockReceiptError(error: unknown, fallback: string) {

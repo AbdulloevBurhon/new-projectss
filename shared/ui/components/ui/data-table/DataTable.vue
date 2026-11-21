@@ -8,6 +8,7 @@ const props = withDefaults(defineProps<{
   columns: Column[]
   rows: any[]
   rowKey?: string
+  resetKey?: string
   emptyText?: string
   pageSizeOptions?: number[]
 }>(), {
@@ -23,7 +24,7 @@ const pageCount = computed(() => Math.max(1, Math.ceil(props.rows.length / pageS
 const visibleRows = computed(() => props.rows.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
 const firstIndex = computed(() => (page.value - 1) * pageSize.value)
 
-watch(() => props.rows, () => { page.value = 1 })
+watch(() => props.resetKey ?? props.rows, () => { page.value = 1 })
 watch(() => props.rows.length, () => { page.value = Math.min(page.value, pageCount.value) })
 watch(() => props.pageSizeOptions, options => {
   if (!options.includes(pageSize.value)) pageSize.value = options[0] ?? 10

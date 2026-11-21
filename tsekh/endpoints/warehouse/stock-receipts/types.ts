@@ -1,7 +1,14 @@
+export const stockReceiptDelaySeconds = 30
+
 export interface StockReceiptAmounts {
   quantity: number | null
   unitPrice: number | null
   salePrice: number | null
+  expiresOn?: string | null
+}
+
+export interface PostedStockReceiptEdit extends StockReceiptAmounts {
+  accountId?: string
 }
 
 export interface StockReceiptDraft extends StockReceiptAmounts {

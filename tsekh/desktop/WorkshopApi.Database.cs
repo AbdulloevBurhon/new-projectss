@@ -50,6 +50,20 @@ CREATE TABLE IF NOT EXISTS transfers (id TEXT PRIMARY KEY, source_account_id TEX
             using (var schema=new SQLiteCommand(SaleSql["schema"],connection,migration))
             {
                 schema.ExecuteNonQuery();
+                schema.CommandText = SaleSql["workersSchema"];
+                schema.ExecuteNonQuery();
+                schema.CommandText = SaleSql["workerResourceSchema"];
+                schema.ExecuteNonQuery();
+                schema.CommandText = SaleSql["ownerPinSchema"];
+                schema.ExecuteNonQuery();
+                schema.CommandText = SaleSql["telegramScheduleSchema"];
+                schema.ExecuteNonQuery();
+                schema.CommandText = SaleSql["clientPaymentSchema"];
+                schema.ExecuteNonQuery();
+                schema.CommandText = SaleSql["revisionSchema"];
+                schema.ExecuteNonQuery();
+                schema.CommandText = SaleSql["expirySchema"];
+                schema.ExecuteNonQuery();
                 migration.Commit();
             }
         }

@@ -1,0 +1,40 @@
+{
+  "listWorkers": [
+    "SELECT id,name,role,phone,permissions,(SELECT warehouses FROM worker_resource_access WHERE worker=workers.id) AS warehouseScope,(SELECT accounts FROM worker_resource_access WHERE worker=workers.id) AS accountScope FROM workers ORDER BY name, rowid"
+  ],
+  "findWorker": [
+    "SELECT id,name,role,phone,permissions,salt,pin_hash,(SELECT warehouses FROM worker_resource_access WHERE worker=workers.id) AS warehouseScope,(SELECT accounts FROM worker_resource_access WHERE worker=workers.id) AS accountScope FROM workers WHERE id=@id"
+  ],
+  "workerPinCandidates": [
+    "SELECT id,name,role,phone,permissions,salt,pin_hash,(SELECT warehouses FROM worker_resource_access WHERE worker=workers.id) AS warehouseScope,(SELECT accounts FROM worker_resource_access WHERE worker=workers.id) AS accountScope FROM workers WHERE id<>@except"
+  ],
+  "createWorker": [
+    "INSERT INTO workers(id,name,role,phone,salt,pin_hash) VALUES(@id,@name,@role,@phone,@salt,@hash)"
+  ],
+  "editWorker": [
+    "UPDATE workers SET name=@name,role=@role,phone=@phone,salt=coalesce(@salt,salt),pin_hash=coalesce(@hash,pin_hash)",
+    "WHERE id=@id"
+  ],
+  "deleteWorker": [
+    "DELETE FROM workers WHERE id=@id"
+  ],
+  "workerRights": [
+    "UPDATE workers SET permissions=json_insert(@permissions,'$[#]','clients.pay.configured') WHERE id=@id"
+  ],
+  "workerSession": [
+    "SELECT w.id,w.name,w.role,w.phone,w.permissions,(SELECT warehouses FROM worker_resource_access WHERE worker=w.id) AS warehouseScope,(SELECT accounts FROM worker_resource_access WHERE worker=w.id) AS accountScope FROM workers w JOIN worker_sessions s ON s.worker=w.id",
+    "WHERE s.token=@token AND s.expires>@now"
+  ],
+  "openWorkerSession": [
+    "INSERT INTO worker_sessions SELECT @token,id,@expires FROM workers WHERE id=@id AND pin_hash=@hash"
+  ],
+  "closeWorkerSession": [
+    "DELETE FROM worker_sessions WHERE token=@token"
+  ],
+  "revokeWorkerSessions": [
+    "DELETE FROM worker_sessions WHERE worker=@id"
+  ],
+  "pruneWorkerSessions": [
+    "DELETE FROM worker_sessions WHERE expires<=@now"
+  ]
+}

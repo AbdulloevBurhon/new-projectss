@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { PinAccess, toast } from '@obshaya/ui'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { clientApi, installationId, type ActivationStatus } from '@obshaya/contracts/client-api'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { clientApi, installationId, isTemporaryPin, type ActivationStatus } from '@obshaya/contracts/client-api'
+import { useEmployeeAccess } from '../../workers/composables/useEmployeeAccess'
 import { usePinAccess } from '../composables/usePinAccess'
+import { employeeError } from '../../../../endpoints/workers/service'
+import { syncOwnerPin } from '../../../../endpoints/workers/owner-pin'
 
-const { error, verify } = usePinAccess()
+const { access, error, verifyOwnerPin, lock } = usePinAccess()
+const { leave, login, token } = useEmployeeAccess()
 const busy = ref(false)
 const apiBase = useRuntimeConfig().public.licenseApiBase as string
 const license = useCookie<string | null>('tsekh_license_active')
@@ -27,6 +31,7 @@ async function refreshDisabledStatus() {
 }
 
 onMounted(() => {
+  lock()
   if (licenseNotice.value === 'disabled') {
     void refreshDisabledStatus()
     statusTimer = setInterval(() => void refreshDisabledStatus(), 10000)
@@ -40,9 +45,28 @@ async function submit(pin: string) {
   if (busy.value) return
   busy.value = true
   try {
-    if (!await verify(pin)) { toast.error(error.value); return }
+    const result = await verifyOwnerPin(pin)
+    if (result === 'failed') return
+    if (result === 'owner' || result === 'owner-offline') {
+      await leave().catch(() => {})
+      if (!isTemporaryPin()) await syncOwnerPin(pin, result === 'owner' ? 'sync' : 'initialize')
+    } else {
+      if (license.value !== '1' || !(Date.parse(licenseUntil.value ?? '') > Date.now()) || licenseNotice.value === 'disabled') {
+        error.value = 'Для входа сотрудника нужна активная лицензия.'
+        return
+      }
+      access.value = null
+      await nextTick()
+      if (token.value) await leave().catch(() => {})
+      await login(pin)
+      access.value = '1'
+    }
+    await nextTick()
     toast.success('PIN-код принят')
-    await navigateTo('/')
+    await navigateTo(isTemporaryPin() ? '/settings' : '/')
+  } catch (cause) {
+    lock()
+    error.value = employeeError(cause, 'Не удалось войти. Проверьте PIN-код.')
   } finally { busy.value = false }
 }
 
@@ -55,5 +79,7 @@ async function support(message: string) {
 </script>
 
 <template>
-  <PinAccess brand-name="Цех" logo-text="Ц" :error="error" :submitting="busy" :notice="licenseNotice === 'disabled' ? 'Услуга не оплачена. Обратитесь в службу поддержки.' : ''" @submit="submit" @support="support" @clear-error="clearError" />
+  <PinAccess brand-name="Цех" logo-text="Ц" :error="error" :submitting="busy"
+    :notice="licenseNotice === 'disabled' ? 'Услуга не оплачена. Обратитесь в службу поддержки.' : ''"
+    @submit="submit" @support="support" @clear-error="clearError" />
 </template>

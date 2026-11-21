@@ -1,0 +1,15 @@
+{
+  "ownerPinSchema": [
+    "CREATE TABLE IF NOT EXISTS owner_pin_guards (kind TEXT PRIMARY KEY CHECK(kind IN ('current','pending')),salt TEXT NOT NULL,pin_hash TEXT NOT NULL,reservation TEXT NOT NULL,expires INTEGER NOT NULL);"
+  ],
+  "ownerPinGuards": [
+    "SELECT * FROM owner_pin_guards"
+  ],
+  "writeOwnerPinGuard": [
+    "INSERT INTO owner_pin_guards(kind,salt,pin_hash,reservation,expires) VALUES(@kind,@salt,@hash,@reservation,@expires)",
+    "ON CONFLICT(kind) DO UPDATE SET salt=excluded.salt,pin_hash=excluded.pin_hash,reservation=excluded.reservation,expires=excluded.expires"
+  ],
+  "clearOwnerPinGuard": [
+    "DELETE FROM owner_pin_guards WHERE kind='pending' AND reservation=@reservation"
+  ]
+}

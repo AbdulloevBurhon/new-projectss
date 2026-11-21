@@ -1,35 +1,55 @@
 <script setup lang="ts">
 import { BackupScheduleCard, SettingsWorkspace, StorageLocationsCard, scheduledArchiveKey, useArchiveFolders } from '@obshaya/ui'
+import { useSettingsArchive } from '../../features/settings/composables/useSettingsArchive'
+import TelegramDeliveryCard from '../../features/settings/components/TelegramDeliveryCard.vue'
+import ReceiptPrinterCard from '../../features/settings/components/ReceiptPrinterCard.vue'
+import { TabsContent, TabsTrigger } from '@obshaya/ui'
 import { rememberOfflinePin } from '../../features/access/composables/offlinePin'
-import { clientApi, saveClientPin } from '@obshaya/contracts/client-api'
-import { uploadProductArchive } from '@obshaya/contracts/client-archive'
-import { createWorkshopArchive, restoreWorkshopArchive } from '../../../endpoints/settings/archive/archive.service'
+import { useTemporaryPinState } from '../../features/access/composables/useTemporaryPinState'
+import { clientApi, ClientApiError, getClientPin, isTemporaryPin, saveClientPin } from '@obshaya/contracts/client-api'
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { desktopUpdates, findUpdate, installOrDownloadUpdate } from '../../../endpoints/settings/updates/updates.service'
 import type { ClientUpdate } from '../../../endpoints/settings/updates/updates.types'
+import { finishOwnerPin, reserveOwnerPin, syncOwnerPin } from '../../../endpoints/workers/owner-pin'
+import { employeeError } from '../../../endpoints/workers/service'
 
 const { licenseApiBase: apiBase, appVersion } = useRuntimeConfig().public
 const licenseUntil=useCookie<string|null>('tsekh_license_until')
 const online = ref(false)
+const temporarySession = useTemporaryPinState()
 const updateAvailable = ref<ClientUpdate | null>(null)
 const installingUpdate = ref(false)
 const desktop = ref(false)
-const cloudCopyEnabled = ref(false)
 const cloudArchiveAllowed = useState('tsekh-cloud-archive-allowed', () => true)
-const uploadingArchive = ref(false)
-const archiving = ref(false)
+const telegramAllowed = computed(() => cloudArchiveAllowed.value && !temporarySession.value)
+const { cloudCopyEnabled, uploadingArchive, exportData, importData, setCloudCopy, denyCloudCopy } = useSettingsArchive(apiBase, online, cloudArchiveAllowed)
 const { localFolder, secondaryFolder, chooseFolder } = useArchiveFolders('tsekh')
 const { schedule, last, saveSchedule, downloadLast } = inject(scheduledArchiveKey)!
 const lastBackup = computed(() => last.value && new Date(last.value.createdAt).toLocaleString('ru-RU'))
-const cloudCopyKey = 'obshaya:settings:tsekh:cloud-copy'
 const updateOnline = () => { online.value = navigator.onLine }
 
 async function changePin(pin: string) {
   try {
-    await clientApi(apiBase, '/api/client/pin/change', { method: 'POST', body: JSON.stringify({ pin }) }, 'tsekh')
-    await rememberOfflinePin(pin,licenseUntil.value).catch(()=>{});saveClientPin(pin); toast.success('PIN-код изменён.')
-  } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось изменить PIN-код.') }
+    const current = getClientPin()
+    if (current && !isTemporaryPin()) await syncOwnerPin(current, 'initialize')
+    const { reservation } = await reserveOwnerPin(pin)
+    try {
+      await clientApi(apiBase, '/api/client/pin/change', {
+        method: 'POST', signal: AbortSignal.timeout(10000), body: JSON.stringify({ pin }),
+      }, 'tsekh')
+    } catch (cause) {
+      if (cause instanceof ClientApiError && cause.status < 500) await finishOwnerPin('cancel', reservation).catch(() => {})
+      throw cause
+    }
+    saveClientPin(pin)
+    temporarySession.value = false
+    await finishOwnerPin('commit', reservation).catch(() => syncOwnerPin(pin))
+    await rememberOfflinePin(pin, licenseUntil.value).catch(() => {})
+    toast.success('PIN-код изменён.')
+  } catch (error) {
+    toast.error(employeeError(error, error instanceof Error ? error.message : 'Не удалось изменить PIN-код.'))
+  }
 }
 
 async function checkUpdates() {
@@ -53,55 +73,19 @@ async function downloadUpdate(id: string) {
   }
 }
 
-async function exportData() {
-  if (archiving.value) return
-  archiving.value = true
-  try { await downloadArchive(await createWorkshopArchive()) }
-  catch { toast.error('Не удалось создать архив данных «Цеха».') }
-  finally { archiving.value = false }
-}
-
-async function downloadArchive(archive: Awaited<ReturnType<typeof createWorkshopArchive>>) {
-  const url = URL.createObjectURL(archive.blob)
-  const link = document.createElement('a'); link.href = url; link.download = archive.fileName; link.click()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-  if (!cloudCopyEnabled.value) return toast.success('Локальная копия скачана.')
-  if (!cloudArchiveAllowed.value) return denyCloudCopy()
-  if (!online.value) return toast.error('Локальная копия скачана, но для облака нужен интернет.')
-  uploadingArchive.value = true
-  try {
-    await uploadProductArchive(apiBase, new File([archive.blob], archive.fileName, { type: 'application/json' }), 'tsekh')
-    toast.success('Копия загружена в облако. Она доступна в админке → Архивация.')
-  } catch (error) { toast.error(error instanceof Error ? `Копия скачана, но не загружена в облако: ${error.message}` : 'Копия скачана, но не загружена в облако.') }
-  finally { uploadingArchive.value = false }
-}
-
-async function importData(file: File) {
-  if (archiving.value) return
-  archiving.value = true
-  try {
-    if (await restoreWorkshopArchive(file)) toast.success('Данные восстановлены. Перезагрузите страницу, чтобы обновить разделы.')
-  } catch (error) {
-    const response = (error as { data?: { data?: { message?: string }; statusMessage?: string } } | null)?.data
-    toast.error(response?.data?.message || response?.statusMessage || (error instanceof Error ? error.message : 'Не удалось импортировать архив.'))
-  } finally { archiving.value = false }
-}
-
-function setCloudCopy(enabled: boolean) {
-  if(enabled && !cloudArchiveAllowed.value){denyCloudCopy();return}
-  cloudCopyEnabled.value = enabled
-  localStorage.setItem(cloudCopyKey, String(enabled))
-  toast.success(enabled ? 'Облачная копия включена для следующего экспорта.' : 'Экспорт будет сохраняться только на устройстве.')
-}
-
-function denyCloudCopy() { toast.error('Администратор запретил сохранять данные в облако.') }
-
-onMounted(() => { desktop.value = !!desktopUpdates(); updateOnline(); cloudCopyEnabled.value = localStorage.getItem(cloudCopyKey) === 'true'; addEventListener('online', updateOnline); addEventListener('offline', updateOnline) })
+onMounted(() => { desktop.value = !!desktopUpdates(); updateOnline(); addEventListener('online', updateOnline); addEventListener('offline', updateOnline) })
 onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEventListener('offline', updateOnline) })
 </script>
 
 <template>
   <SettingsWorkspace class="[&_section.auto-rows-fr]:auto-rows-auto" product-name="Цех" :current-version="appVersion" :install-updates="desktop" :installing-update="installingUpdate" :online="online" :update-available="updateAvailable" :cloud-copy-enabled="cloudCopyEnabled" :uploading-archive="uploadingArchive" @change-pin="changePin" @check-updates="checkUpdates" @download-update="downloadUpdate" @export-data="exportData" @import-data="importData" @toggle-cloud-copy="setCloudCopy">
+    <template #tabs><TabsTrigger value="printer" class="h-9 rounded-lg px-4">Принтер</TabsTrigger></template>
+    <template #panels><TabsContent value="printer"><ReceiptPrinterCard /></TabsContent></template>
+    <template #notice>
+      <p v-if="temporarySession" class="rounded-lg border bg-muted px-4 py-3 text-sm" role="status">
+        Вы вошли по временному PIN-коду. Сохраните новый пятизначный PIN-код ниже, чтобы открыть рабочие разделы и включить Telegram.
+      </p>
+    </template>
     <StorageLocationsCard
       :local-path="localFolder?.name"
       :secondary-path="secondaryFolder?.name"
@@ -117,5 +101,8 @@ onBeforeUnmount(() => { removeEventListener('online', updateOnline); removeEvent
         </div>
       </template>
     </BackupScheduleCard>
+    <ClientOnly>
+      <TelegramDeliveryCard :api-base="apiBase" :allowed="telegramAllowed" :online="online" :pin-required="temporarySession" />
+    </ClientOnly>
   </SettingsWorkspace>
 </template>

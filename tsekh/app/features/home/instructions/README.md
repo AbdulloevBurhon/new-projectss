@@ -1,6 +1,9 @@
-# home feature
+# Главная и боковое меню
 
-- components/: UI owned by this section.
-- composables/: section-specific UI behavior and orchestration.
-- Keep API calls in 	sekh/endpoints; do not import another feature's internals.
-- Keep files focused and under 120 lines; split by responsibility when needed.
+[Главная карта](../../../../STRUCTURE.md)
+
+- `/` задан в `app/pages/index.vue` и подключает `components/HomePage.vue`.
+- Список пунктов, переходы и видимость разделов по правам находятся в [`app.vue`](../../../app.vue). Сворачивание и вёрстка меню находятся в [`SidebarLayout.vue`](../../../../../shared/ui/components/sidebar-layout/SidebarLayout.vue). Карточки заданы в `HomePage.vue` и используют ту же проверку `canVisit`, что сайдбар. Главная открывается и у сотрудника без назначенных разделов, в этом случае показывается сообщение.
+- Ограничения переходов по лицензии определяет `app/middleware/access.global.ts`. При добавлении пункта меню проверь маршрут, видимость для активной роли и допуск к серверным действиям.
+- [Ревизия](../../revision/INSTRUCTION.md) находится рядом со «Складами» и использует право «Склады». На узком экране сайдбар раздела автоматически сворачивается.
+- После изменения открой главную, перейди в соседний раздел, сверни и разверни меню. Повтори под администратором и под сотрудником с ограниченными правами.

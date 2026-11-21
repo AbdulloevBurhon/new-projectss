@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ChartColumn, ChartPie, ChevronLeft, ChevronRight, Contact, House, LogOut, ShoppingCart, SlidersHorizontal, Users, Wallet, Warehouse } from '@lucide/vue'
-import { ref } from 'vue'
+import { ChartColumn, ChartPie, ChevronLeft, ChevronRight, ClipboardCheck, Contact, House, LogOut, ShoppingCart, SlidersHorizontal, Users, Wallet, Warehouse } from '@lucide/vue'
+import { computed, ref } from 'vue'
+import { useMediaQuery } from '@vueuse/core'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog'
 
-const icons = { home: House, settings: SlidersHorizontal, warehouse: Warehouse, account: Wallet, workers: Users, clients: Contact, sales: ShoppingCart, reports: ChartColumn, summary: ChartPie }
+const icons = { home: House, settings: SlidersHorizontal, warehouse: Warehouse, revision: ClipboardCheck, account: Wallet, workers: Users, clients: Contact, sales: ShoppingCart, reports: ChartColumn, summary: ChartPie }
 type SidebarItem = { label: string; to: string; icon: keyof typeof icons }
 
 const props = defineProps<{
@@ -14,9 +15,12 @@ const props = defineProps<{
   items: SidebarItem[]
   activePath: string
   workspaceTitle: string
+  compactOnMobile?: boolean
 }>()
 const emit = defineEmits<{ navigate: [to: string]; logout: [] }>()
-const collapsed = ref(false)
+const userCollapsed = ref<boolean>()
+const narrow = useMediaQuery('(max-width: 640px)', { ssrWidth: 1024 })
+const collapsed = computed(() => userCollapsed.value ?? (!!props.compactOnMobile && narrow.value))
 const logoutDialogOpen = ref(false)
 
 function isActive(to: string) {
@@ -44,6 +48,7 @@ function isActive(to: string) {
           class="sidebar-layout__nav-item"
           :class="{ 'sidebar-layout__nav-item--active': isActive(item.to) }"
           :aria-current="isActive(item.to) ? 'page' : undefined"
+          :aria-label="item.label"
           :title="collapsed ? item.label : undefined"
           @click="emit('navigate', item.to)"
         >
@@ -64,7 +69,7 @@ function isActive(to: string) {
           type="button"
           :aria-label="collapsed ? 'Развернуть меню' : 'Свернуть меню'"
           :title="collapsed ? 'Развернуть меню' : 'Свернуть меню'"
-          @click="collapsed = !collapsed"
+          @click="userCollapsed = !collapsed"
         >
           <ChevronRight v-if="collapsed" :size="17" />
           <ChevronLeft v-else :size="17" />

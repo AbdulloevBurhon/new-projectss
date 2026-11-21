@@ -55,6 +55,7 @@ function sendSupport() {
       <p v-if="error" class="mt-3 flex items-center gap-2 text-sm text-destructive" role="alert"><AlertCircle :size="16" />{{ error }}</p>
       <Button type="submit" class="mt-4 w-full bg-lime-400 text-slate-950 hover:bg-lime-500" :disabled="!!notice || submitting || pin.length !== 5">{{ submitting ? 'Проверка…' : 'Войти' }}</Button>
       <p v-if="notice" class="mt-3 text-center text-sm font-medium text-rose-700" role="status">{{ notice }}</p>
+
     </form>
     <Button type="button" aria-label="Написать в поддержку" title="Написать в поддержку" class="fixed bottom-5 right-5 grid size-12 place-items-center rounded-full bg-lime-400 p-0 text-slate-950 shadow-md hover:bg-lime-500" @click="supportOpen = true"><MessageSquare :size="20" aria-hidden="true" /></Button>
     <Dialog v-model:open="supportOpen">

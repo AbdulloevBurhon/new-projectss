@@ -1,14 +1,22 @@
 <script setup lang="ts">
+import { useEmployeeAccess } from '../../features/workers/composables/useEmployeeAccess'
 import { computed, onMounted, ref } from 'vue'
 import { customers, saveClient, deleteClient, type Client } from '../../../endpoints/sales/service'
-import { Contact, Info, Pencil, Plus, Trash2 } from '@lucide/vue'
+import { Contact, Info, Pencil, Plus, Trash2, Wallet } from '@lucide/vue'
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, Button, DataTable, Input, Tabs, TabsContent, TabsList, TabsTrigger } from '@obshaya/ui'
 import ClientFormDialog from '../../features/clients/components/ClientFormDialog.vue'
 import ClientDetailsDialog from '../../features/clients/components/ClientDetailsDialog.vue'
+import ClientDebtPaymentDialog from '../../features/clients/components/ClientDebtPaymentDialog.vue'
+
+type ClientDialog = 'form' | 'details' | 'payment' | 'delete'
 
 const clients = ref<Client[]>([])
 const error = ref('')
-onMounted(async()=>{try{clients.value=await customers()}catch{error.value='Не удалось загрузить клиентов.'}})
+async function loadClients() {
+  try { clients.value = await customers(); error.value = '' }
+  catch { error.value = 'Не удалось загрузить клиентов.' }
+}
+onMounted(loadClients)
 const search = ref('')
 const visibleClients = computed(() => {
   const query = search.value.trim().toLocaleLowerCase('ru')
@@ -18,14 +26,14 @@ const visibleClients = computed(() => {
     || client.phone.includes(query) || (digits && client.phone.replace(/\D/g, '').includes(digits)))
 })
 const selected = ref<Client>()
-const dialog = ref<'form' | 'details' | 'delete' | null>(null)
+const dialog = ref<ClientDialog | null>(null)
 const columns = [
   { key: 'name', label: 'Имя' },
   { key: 'phone', label: 'Телефон' },
   { key: 'debt', label: 'Долг' },
   { key: 'actions', label: 'Действия', align: 'right' as const },
 ]
-function openDialog(kind: 'form' | 'details' | 'delete', client?: Client) {
+function openDialog(kind: ClientDialog, client?: Client) {
   selected.value = client
   dialog.value = kind
 }
@@ -39,6 +47,13 @@ async function remove(){
   catch {error.value='Не удалось удалить клиента. Проверьте, есть ли продажи на его имя.'}
   dialog.value=null
 }
+
+async function paymentSaved() {
+  dialog.value = null
+  await loadClients()
+}
+
+const { can } = useEmployeeAccess()
 </script>
 
 <template>
@@ -55,12 +70,20 @@ async function remove(){
           <Button class="ml-auto" @click="openDialog('form')"><Plus class="size-4" />Клиент</Button>
         </div>
         <DataTable :columns="columns" :rows="visibleClients" :empty-text="search.trim() ? 'Совпадений не найдено' : 'Клиентов пока нет'">
-          <template #cell-debt="{ row }">{{ row.debt.toLocaleString('ru-RU') }} сом</template>
+          <template #cell-debt="{ row }"><span :class="{ 'text-destructive': row.debt > 0 }">{{ row.debt.toLocaleString('ru-RU') }} сом</span></template>
           <template #cell-actions="{ row }">
             <div class="flex justify-end gap-1">
               <Button size="icon" variant="ghost" :aria-label="'Информация о клиенте ' + row.name" @click="openDialog('details', row)"><Info class="size-4 text-sky-600" /></Button>
-              <Button size="icon" variant="ghost" :aria-label="'Редактировать клиента ' + row.name" @click="openDialog('form', row)"><Pencil class="size-4 text-blue-600" /></Button>
-              <Button size="icon" variant="ghost" :aria-label="'Удалить клиента ' + row.name" @click="openDialog('delete', row)"><Trash2 class="size-4 text-destructive" /></Button>
+              <span v-if="can('clients.pay') && can('accounts')" class="inline-flex items-center"
+                :title="row.debt > 0 ? 'Погасить долг' : 'У клиента нет долга'">
+                <Button size="sm" variant="ghost" :disabled="row.debt <= 0"
+                  :aria-label="'Погасить долг клиента ' + row.name" @click="openDialog('payment', row)">
+                  <Wallet class="size-4 text-green-700" />
+                  <span class="hidden sm:inline">Погасить долг</span>
+                </Button>
+              </span>
+              <Button v-if="can('clients.edit')" size="icon" variant="ghost" :aria-label="'Редактировать клиента ' + row.name" @click="openDialog('form', row)"><Pencil class="size-4 text-blue-600" /></Button>
+              <Button v-if="can('clients.delete')" size="icon" variant="ghost" :aria-label="'Удалить клиента ' + row.name" @click="openDialog('delete', row)"><Trash2 class="size-4 text-destructive" /></Button>
             </div>
           </template>
         </DataTable>
@@ -68,6 +91,7 @@ async function remove(){
     </Tabs>
     <ClientFormDialog v-if="dialog === 'form'" :client="selected" @save="save" @close="dialog = null" />
     <ClientDetailsDialog v-if="dialog === 'details' && selected" :client="selected" @close="dialog = null" />
+    <ClientDebtPaymentDialog v-if="dialog === 'payment' && selected" :client="selected" @paid="paymentSaved" @close="dialog = null" />
     <AlertDialog :open="dialog === 'delete'" @update:open="open => { if (!open) dialog = null }">
       <AlertDialogContent>
         <AlertDialogHeader>

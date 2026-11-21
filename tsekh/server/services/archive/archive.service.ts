@@ -1,8 +1,9 @@
 import database from '../../database/accounts/accounts.database'
 import '../sales/sales.service'
+import queries from '../../database/sales/queries'
 import { barcodeMaxLength } from '../../../endpoints/warehouse/products/products.types'
 
-const tables = ['accounts', 'warehouses', 'products', 'receipts', 'expenses', 'transfers', 'stock_receipts','clients','sales','sale_lines','stock_movements'] as const
+const tables = ['accounts', 'warehouses', 'products', 'receipts', 'expenses', 'transfers', 'stock_receipts','clients','sales','sale_lines','stock_movements','workers','sale_workers','client_payments','worker_resource_access','stock_revisions','stock_revision_lines','stock_batches'] as const
 type Column = { name: string; type: string; notnull: number; pk: number }
 const schema = tables.map(table => {
   const columns = database.pragma(`table_info(${table})`) as Column[]
@@ -22,9 +23,33 @@ const invalidStock = database.prepare(`SELECT 1 FROM stock_receipts s WHERE
     OR NOT EXISTS (SELECT 1 FROM warehouses WHERE id=s.warehouse_id)
     OR NOT EXISTS (SELECT 1 FROM products WHERE id=s.product_id))) LIMIT 1`)
 
-export const exportDatabase = database.transaction(() => ({
-  version: 1,
-  tables: Object.fromEntries(schema.map(({ table, select }) => [table, select.all()])),
+function databaseSnapshot() {
+  return { version: 1, tables: Object.fromEntries(schema.map(({ table, select }) => [table, select.all()])) }
+}
+
+export const exportDatabase = database.transaction(databaseSnapshot)
+
+const telegramStock = database.prepare(queries.telegramStock)
+const telegramSales = database.prepare(queries.telegramSales)
+const telegramDaySales = database.prepare(queries.telegramDaySales)
+
+export const exportTelegramSummary = database.transaction((start?: string, previous?: string, end?: string, includeBackup = false) => ({
+  ...(includeBackup ? { database: databaseSnapshot() } : {}),
+  stock: telegramStock.all(),
+  sales: telegramSales.get(),
+  ...(start && previous && end ? {
+    today: telegramDaySales.get({ from: start, to: end }),
+    yesterday: telegramDaySales.get({ from: previous, to: start }),
+  } : {}),
+}))
+
+const stockReport = database.prepare(queries.stock)
+const salesReport = database.prepare(queries.report)
+
+export const exportTelegramSnapshot = database.transaction(() => ({
+  database: databaseSnapshot(),
+  stock: stockReport.all(),
+  sales: salesReport.all(),
 }))
 
 function invalidArchive() {
@@ -40,11 +65,12 @@ function validateRows(rows: unknown, columns: Column[], table: typeof tables[num
   if (!Array.isArray(rows)) throw invalidArchive()
   return rows.map((row: unknown) => {
     if (!record(row)) throw invalidArchive()
-    const legacyProduct = table === 'products' && !Object.hasOwn(row, 'barcode')
-    if (Object.keys(row).length !== columns.length - Number(legacyProduct)) throw invalidArchive()
+    const optional = table === 'products' ? 'barcode' : table === 'stock_receipts' ? 'expires_on' : ''
+    const legacyColumn = optional && !Object.hasOwn(row, optional) ? optional : ''
+    if (Object.keys(row).length !== columns.length - Number(!!legacyColumn)) throw invalidArchive()
     const validated: Record<string, string | number | null> = {}
     for (const { name, type, notnull, pk } of columns) {
-      if (name === 'barcode' && legacyProduct) { validated[name] = null; continue }
+      if (name === legacyColumn) { validated[name] = null; continue }
       if (!Object.hasOwn(row, name)) throw invalidArchive()
       const value = row[name]
       if (value === null && !notnull && !pk) validated[name] = null
@@ -57,20 +83,23 @@ function validateRows(rows: unknown, columns: Column[], table: typeof tables[num
   })
 }
 
+const invalidClientDebt = database.prepare(queries.invalidClientDebt)
+const invalidStockBatches = database.prepare(queries.invalidStockBatches)
+
 const replaceDatabase = database.transaction((snapshot: ReturnType<typeof validateRows>[]) => {
   // Clear child tables first so pending receipts and foreign keys cannot block parent rows.
   for (const { clear } of [...schema].reverse()) clear.run()
   schema.forEach(({ insert }, index) => snapshot[index]!.forEach(row => insert.run(row)))
-  if (invalidStock.get()) throw invalidArchive()
+  if (invalidStock.get() || invalidStockBatches.get() || invalidClientDebt.get() || database.prepare(queries.invalidWorkerResources).get()) throw invalidArchive()
 })
 
 export function importDatabase(value: unknown) {
   if (!record(value) || value.version !== 1 || !record(value.tables)) throw invalidArchive()
   const source = {...value.tables}
-  if (Object.keys(source).length===7 && tables.slice(0,7).every(t=>Object.hasOwn(source,t))) {
-    for(const t of tables.slice(7)) source[t]=[]
+  const count = Object.keys(source).length
+  if ([7, 10, 11, 13, 14, 15, 17].includes(count) && tables.slice(0, count).every(table => Object.hasOwn(source, table))) {
+    for (const table of tables.slice(count)) source[table] = []
   }
-  if(Object.keys(source).length===10 && tables.slice(0,10).every(t=>Object.hasOwn(source,t))) source.stock_movements=[]
   if (Object.keys(source).length !== tables.length) throw invalidArchive()
   const snapshot = schema.map(({ table, columns }) => validateRows(source[table], columns, table))
   try { replaceDatabase.immediate(snapshot) }

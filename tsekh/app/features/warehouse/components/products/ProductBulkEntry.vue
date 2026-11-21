@@ -4,7 +4,7 @@ import { Button, DataTable, Input } from '@obshaya/ui'
 import type { Product, ProductDraft } from '../../../../../endpoints/warehouse/products/products.types'
 import ProductUnitSelect from './ProductUnitSelect.vue'
 import { useBulkProducts } from '../../composables/products/useBulkProducts'
-const props = defineProps<{ save: (draft: ProductDraft, id?: string) => Promise<Product | null>; error?: string }>()
+const props = defineProps<{ save: (draft: ProductDraft, id?: string) => Promise<Product | null>; canEdit: boolean; error?: string }>()
 const { rows,visibleRows,pageSizeOptions,resizeRows,changed,quantitySummary,acceptRow,editRow } = useBulkProducts(props)
 const columns = [
   { key: 'name', label: 'Название', class: 'min-w-44' }, { key: 'barcode', label: 'Штрих', class: 'min-w-36' },
@@ -42,7 +42,7 @@ const columns = [
           <div class="flex items-center justify-end gap-2">
             <span v-if="row.mode === 'saved'" class="text-sm text-emerald-700">Сохранено</span>
             <span v-else-if="row.mode === 'countdown'" class="inline-flex items-center gap-1 text-xs text-muted-foreground" aria-live="polite"><Clock3 class="size-3.5" />{{ row.seconds }} с</span>
-            <Button size="icon" variant="ghost" :disabled="row.queued || (row.mode === 'editing' && !row.name.trim())" :aria-label="row.mode === 'editing' ? `Принять товар ${row.name || ''}` : `Редактировать товар ${row.name}`" @click="row.mode === 'editing' ? acceptRow(row) : editRow(row)">
+            <Button v-if="!row.productId || canEdit" size="icon" variant="ghost" :disabled="row.queued || (row.mode === 'editing' && !row.name.trim())" :aria-label="row.mode === 'editing' ? `Принять товар ${row.name || ''}` : `Редактировать товар ${row.name}`" @click="row.mode === 'editing' ? acceptRow(row) : editRow(row)">
               <Check v-if="row.mode === 'editing'" class="size-4 text-emerald-600" />
               <Pencil v-else class="size-4 text-blue-600" />
             </Button>

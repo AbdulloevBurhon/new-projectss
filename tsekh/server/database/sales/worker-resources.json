@@ -1,0 +1,37 @@
+{
+  "workerResourceSchema": [
+    "CREATE TABLE IF NOT EXISTS worker_resource_access (worker TEXT PRIMARY KEY NOT NULL REFERENCES workers(id) ON DELETE CASCADE,",
+    "warehouses TEXT CHECK(warehouses IS NULL OR (json_valid(warehouses) AND json_type(warehouses)='array')),",
+    "accounts TEXT CHECK(accounts IS NULL OR (json_valid(accounts) AND json_type(accounts)='array')));"
+  ],
+  "getWorkerResources": [
+    "SELECT warehouses,accounts FROM worker_resource_access WHERE worker=@id"
+  ],
+  "saveWorkerResources": [
+    "INSERT INTO worker_resource_access(worker,warehouses,accounts) VALUES(@id,@warehouses,@accounts)",
+    "ON CONFLICT(worker) DO UPDATE SET warehouses=excluded.warehouses,accounts=excluded.accounts"
+  ],
+  "invalidWorkerResources": [
+    "SELECT 1 FROM worker_resource_access a",
+    "WHERE EXISTS(SELECT 1 FROM json_each(a.warehouses) WHERE type<>'text' OR value='')",
+    "OR EXISTS(SELECT 1 FROM json_each(a.accounts) WHERE type<>'text' OR value='') LIMIT 1"
+  ],
+  "scopeStockReceipt": [
+    "SELECT warehouse_id AS warehouse,account_id AS account FROM stock_receipts WHERE id=@id"
+  ],
+  "scopeReceipt": [
+    "SELECT account_id AS account FROM receipts WHERE id=@id"
+  ],
+  "scopeExpense": [
+    "SELECT account_id AS account FROM expenses WHERE id=@id"
+  ],
+  "scopeTransfer": [
+    "SELECT source_account_id AS account,target_account_id AS targetAccount FROM transfers WHERE id=@id"
+  ],
+  "scopeSale": [
+    "SELECT warehouse,account FROM sales WHERE id=@id"
+  ],
+  "scopeStockLot": [
+    "SELECT warehouse FROM sale_stock WHERE id=@id"
+  ]
+}

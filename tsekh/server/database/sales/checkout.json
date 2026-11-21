@@ -1,0 +1,52 @@
+{
+  "existing": [
+    "SELECT id FROM sales WHERE id=@id"
+  ],
+  "stage": [
+    "CREATE TEMP TABLE IF NOT EXISTS checkout(lot TEXT,name TEXT,unit TEXT,qty REAL CHECK(qty>0 AND",
+    "qty<=1000000),baseQty REAL NOT NULL CHECK(baseQty>0),price REAL CHECK(price>=0 AND price<=100000000),listPrice",
+    "REAL,amount INTEGER,stock REAL);",
+    "DELETE FROM checkout;"
+  ],
+  "lines": [
+    "INSERT INTO checkout SELECT s.id,s.name,CASE j.value->>'$.mode' WHEN 'pack' THEN s.unit WHEN",
+    "'g' THEN 'г' ELSE s.contentUnit END,j.value->>'$.qty',(j.value->>'$.qty')*(CASE WHEN j.value->>'$.mode'='pack'",
+    "THEN 1.0 WHEN j.value->>'$.mode'='content' AND s.contentUnit IS NOT NULL THEN 1.0/s.factor WHEN",
+    "j.value->>'$.mode'='g' AND s.unit='кг' THEN 0.001 END),j.value->>'$.price',s.price*(CASE WHEN",
+    "j.value->>'$.mode'='pack' THEN 1.0 WHEN j.value->>'$.mode'='content' AND s.contentUnit IS NOT",
+    "NULL THEN 1.0/s.factor WHEN j.value->>'$.mode'='g' AND s.unit='кг' THEN 0.001 END),round((j.value->>'$.qty')*(j.value->>'$.price')*100),s.stock",
+    "FROM json_each(@lines) j JOIN sale_stock s ON s.id=j.value->>'$.id' AND s.warehouse=@warehouse",
+    "WHERE json_type(j.value,'$.qty') IN ('real','integer') AND json_type(j.value,'$.price') IN ('real','integer')"
+  ],
+  "valid": [
+    "SELECT count(*)=json_array_length(@lines) AND count(*) BETWEEN 1 AND 1000 AND NOT EXISTS(SELECT",
+    "lot FROM checkout GROUP BY lot HAVING round(sum(baseQty)-min(stock),9)>0) AND NOT EXISTS(SELECT",
+    "1 FROM checkout WHERE unit IN ('шт','уп') AND qty!=cast(qty AS INTEGER)) AS ok FROM checkout"
+  ],
+  "post": [
+    "INSERT INTO sales SELECT @id,strftime('%Y-%m-%dT%H:%M:%fZ','now'),@warehouse,@account,@client,(SELECT",
+    "name FROM warehouses WHERE id=@warehouse),(SELECT name FROM accounts WHERE id=@account),(SELECT",
+    "name FROM clients WHERE id=@client),@seller,@role,@discount,@tender,sum(amount)-@discount,min(@tender,sum(amount)-@discount)",
+    "FROM checkout"
+  ],
+  "copy": [
+    "INSERT INTO sale_lines SELECT @id,lot,name,unit,qty,baseQty,price,listPrice,amount FROM checkout"
+  ],
+  "credit": [
+    "UPDATE accounts SET amount=round(amount+(SELECT paid/100.0 FROM sales WHERE id=@id),2),updated_at=CURRENT_TIMESTAMP",
+    "WHERE id=@account"
+  ],
+  "assignSaleWorker": [
+    "INSERT INTO sale_workers(sale,worker) VALUES(@id,@worker)"
+  ],
+  "workerCheckout": [
+    "SELECT (@settingsAllowed=1 OR (@warehouse=(SELECT id FROM warehouses WHERE @allowedWarehouses IS NULL",
+    "OR id IN (SELECT value FROM json_each(@allowedWarehouses)) ORDER BY name,id LIMIT 1)",
+    "AND @account=(SELECT id FROM accounts WHERE @allowedAccounts IS NULL",
+    "OR id IN (SELECT value FROM json_each(@allowedAccounts)) ORDER BY name,id LIMIT 1))) AND (@discount=0 OR @discountAllowed=1)",
+    "AND",
+    "  (@debtAllowed=1 OR @tender>=coalesce(sum(amount),0)-@discount) AND",
+    "  (@priceAllowed=1 OR NOT EXISTS(SELECT 1 FROM checkout WHERE abs(price-listPrice)>0.00000051))",
+    "AS ok FROM checkout"
+  ]
+}

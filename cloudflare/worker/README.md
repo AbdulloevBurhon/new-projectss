@@ -39,4 +39,10 @@ Client routes use `X-Installation-Id` and `X-Client-Pin`; they cover activation,
 
 ## Current boundary
 
-The admin UI and API handlers are connected to D1/R2. The client endpoints are prepared, but the desktop/client activation, PIN, message, update and archive screens still need to call these endpoints before the complete end-to-end flow is live. Apply the migration and deploy the Worker only after reviewing the changes and setting the secret.
+The admin UI and Tsekh clients use this Worker for activation, PIN, support messages, updates, cloud archives and Telegram. Inventory, sales and employee sessions are served by Tsekh's local API. See the [Tsekh project map](../../tsekh/STRUCTURE.md) and [admin guide](../../tsekh/docs/features/admin.md).
+
+## Отправка отчётов «Цеха» в Telegram
+
+Примените миграции D1 0007–0011, затем разверните Worker. Для выделенного бота задайте секреты `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` и имя `TELEGRAM_BOT_USERNAME` без @. Зарегистрируйте webhook Telegram методом `setWebhook` на `https://<адрес Worker>/api/telegram/webhook`. Передайте тот же `secret_token` и `allowed_updates: ["message"]`.
+
+Клиент подтверждает номер и одобряет первую отправку с постоянным PIN. Оператор задаёт интервал в админке. Обновлённый «Цех» получает его через `GET /api/client/telegram/outbox` и отправляет сохранённый снимок через `POST` на тот же маршрут. Ключ выдаётся через `PUT /api/client/telegram/device` для одобренного получателя и действует при активной лицензии и разрешённой выгрузке. Worker отправляет JSON-бэкап файлом, отчёты текстом и сохраняет в D1 прогресс доставки частей комплекта. Интервал 0 запрещает плановую отправку. Клиентские ручные отправки сохраняют поддержку прежнего формата запросов.

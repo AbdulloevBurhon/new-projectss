@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import SectionPlaceholder from '~/components/SectionPlaceholder.vue'
+import SummaryPage from '../../features/summary/components/SummaryPage.vue'
 </script>
 
-<template><SectionPlaceholder title="Итоги" /></template>
+<template><SummaryPage /></template>

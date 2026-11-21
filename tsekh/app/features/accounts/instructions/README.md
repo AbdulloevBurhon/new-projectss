@@ -1,8 +1,9 @@
-# accounts feature
+# Счета
 
-- components/: UI owned by this section.
-- composables/: section-specific UI behavior and orchestration.
-- Keep API calls in 	sekh/endpoints; do not import another feature's internals.
-- Keep files focused and under 120 lines; split by responsibility when needed.
+[Главная карта](../../../../STRUCTURE.md)
 
-Кнопка информации открывает `AccountDetailsDialog.vue` и загружает баланс и расходы одним запросом `GET /api/accounts/:id`. В таблице с пагинацией показаны проведённые закупки, ручные списания и исходящие переводы. Для закупок количество и цена относятся к единице поступления, а содержимое упаковки показано отдельно.
+- `/accounts` открывает вкладки счёта, поступлений, списаний и переводов. Компоненты лежат в `app/features/accounts/components/`, форматы в `format.ts`. Клиентские запросы находятся в `endpoints/accounts/`.
+- Информация о счёте открывается в [`AccountDetailsDialog.vue`](../components/AccountDetailsDialog.vue). Один `GET /api/accounts/:id` возвращает баланс и операции. Для закупок в истории видны дата, товар, количество, цена закупки и сумма со знаком минус. Также учитываются оплаченные продажи, погашения долга клиентов, ручные поступления, списания и переводы. Колонка «Сотрудник» берёт имя из продажи или платежа. Сотрудник с назначенными счетами видит только их. Для перевода нужен доступ к обоим счетам. Оба окружения используют [account-history.json](../../../../server/database/sales/account-history.json).
+- Локальный API находится в `server/api/accounts/`. Историю собирает [`account-details.service.ts`](../../../../server/services/accounts/account-details.service.ts), реализацию Windows смотри в [`WorkshopApi.AccountDetails.cs`](../../../../desktop/WorkshopApi.AccountDetails.cs).
+- При изменении проведённой закупки исходное списание корректируется вместе с остатком. При смене счёта операция переносится со старого счёта на новый. Смотри [складскую историю](../../warehouse/INSTRUCTION.md).
+- Контрольный сценарий на тестовых счетах. Создай поступление на склад, открой детали исходного счёта, измени закупку на другой счёт и сравни обе истории и балансы. Для перевода проверь оба направления. Для таблицы проверь переход по страницам и пустую историю.

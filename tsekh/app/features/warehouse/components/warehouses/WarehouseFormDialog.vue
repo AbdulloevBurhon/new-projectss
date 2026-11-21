@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { LoaderCircle } from '@lucide/vue'
 import {
   Button, Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle, Input, Label,
@@ -19,12 +20,16 @@ watch(open, (isOpen) => {
 })
 
 function submit() {
-  if (type.value && name.value.trim()) emit('save', { name: name.value, type: type.value })
+  if (!props.saving && type.value && name.value.trim()) emit('save', { name: name.value, type: type.value })
+}
+
+function close() {
+  if (!props.saving) open.value = false
 }
 </script>
 
 <template>
-  <Dialog v-model:open="open">
+  <Dialog :open="open" @update:open="!$event && close()">
     <DialogContent
       :show-close-button="!saving"
       @escape-key-down="saving && $event.preventDefault()"
@@ -50,8 +55,11 @@ function submit() {
         </fieldset>
         <p v-if="error" class="text-sm text-destructive" role="alert">{{ error }}</p>
         <DialogFooter>
-          <Button type="button" variant="outline" :disabled="saving" @click="open = false">Отмена</Button>
-          <Button type="submit" :disabled="saving || !name.trim() || !type">{{ saving ? 'Сохранение…' : 'Сохранить' }}</Button>
+          <Button type="button" variant="outline" :disabled="saving" @click="close">Отмена</Button>
+          <Button type="submit" class="min-w-32" :aria-busy="saving" :disabled="saving || !name.trim() || !type">
+            <LoaderCircle v-if="saving" class="size-4 motion-safe:animate-spin" aria-hidden="true" />
+            {{ saving ? 'Сохранение…' : 'Сохранить' }}
+          </Button>
         </DialogFooter>
       </form>
     </DialogContent>

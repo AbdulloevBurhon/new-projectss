@@ -1,0 +1,70 @@
+{
+  "expirySchema": [
+    "CREATE TABLE IF NOT EXISTS stock_batches (",
+    "receipt TEXT NOT NULL REFERENCES stock_receipts(id) ON DELETE CASCADE,",
+    "lot TEXT NOT NULL CHECK(json_valid(lot)), quantity REAL NOT NULL CHECK(quantity>=0),",
+    "PRIMARY KEY(receipt,lot));",
+    "CREATE INDEX IF NOT EXISTS stock_batches_lot ON stock_batches(lot);",
+    "CREATE VIEW IF NOT EXISTS stock_batch_queue AS",
+    "SELECT b.*,coalesce(sum(b.quantity) OVER (PARTITION BY b.lot",
+    "ORDER BY r.expires_on IS NULL,r.expires_on,r.posted_at,b.receipt",
+    "ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING),0) AS ahead",
+    "FROM stock_batches b JOIN stock_receipts r ON r.id=b.receipt WHERE b.quantity>0;",
+    "CREATE TRIGGER IF NOT EXISTS expiry_receipt_post AFTER UPDATE OF status ON stock_receipts",
+    "WHEN OLD.status<>'posted' AND NEW.status='posted' BEGIN",
+    "INSERT INTO stock_batches(receipt,lot,quantity) VALUES(NEW.id,",
+    "json_array(NEW.warehouse_id,NEW.product_id,NEW.unit,NEW.content_unit,NEW.quantity_per_piece),NEW.quantity); END;",
+    "CREATE TRIGGER IF NOT EXISTS expiry_receipt_edit AFTER UPDATE OF quantity ON stock_receipts",
+    "WHEN OLD.status='posted' AND NEW.quantity<>OLD.quantity BEGIN",
+    "UPDATE stock_batches SET quantity=max(0,quantity+(NEW.quantity-OLD.quantity)) WHERE receipt=OLD.id",
+    "AND lot=json_array(OLD.warehouse_id,OLD.product_id,OLD.unit,OLD.content_unit,OLD.quantity_per_piece); END;",
+    "CREATE TRIGGER IF NOT EXISTS expiry_sell AFTER INSERT ON sale_lines BEGIN",
+    "UPDATE stock_batches SET quantity=max(0,stock_batches.quantity-a.used) FROM",
+    "(SELECT receipt,lot,min(quantity,NEW.baseQty-ahead) used FROM stock_batch_queue",
+    "WHERE lot=NEW.lot AND ahead<NEW.baseQty) a",
+    "WHERE stock_batches.receipt=a.receipt AND stock_batches.lot=a.lot; END;",
+    "CREATE TRIGGER IF NOT EXISTS expiry_move AFTER INSERT ON stock_movements",
+    "WHEN NEW.target IS NOT NULL OR NEW.qty<0 BEGIN",
+    "INSERT INTO stock_batches(receipt,lot,quantity)",
+    "SELECT receipt,json_set(lot,'$[0]',NEW.target),min(quantity,NEW.qty-ahead) FROM stock_batch_queue",
+    "WHERE NEW.target IS NOT NULL AND lot=NEW.lot AND ahead<NEW.qty",
+    "ON CONFLICT(receipt,lot) DO UPDATE SET quantity=stock_batches.quantity+excluded.quantity;",
+    "UPDATE stock_batches SET quantity=max(0,stock_batches.quantity-a.used) FROM",
+    "(SELECT receipt,lot,min(quantity,abs(NEW.qty)-ahead) used FROM stock_batch_queue",
+    "WHERE lot=NEW.lot AND ahead<abs(NEW.qty)) a",
+    "WHERE stock_batches.receipt=a.receipt AND stock_batches.lot=a.lot; END;"
+  ],
+  "expiryRows": [
+    "WITH tracked AS (SELECT lot,sum(quantity) quantity FROM stock_batches GROUP BY lot),",
+    "remaining AS MATERIALIZED (SELECT s.*,round(s.stock-coalesce(t.quantity,0),9) untracked",
+    "FROM sale_stock s LEFT JOIN tracked t ON t.lot=s.id WHERE s.stock>0)",
+    "SELECT b.receipt||':'||b.lot id,s.warehouse,w.name warehouseName,coalesce(p.name,s.name) name,p.barcode,",
+    "s.unit,round(b.quantity,9) quantity,r.expires_on expiresOn,r.posted_at postedAt,b.receipt receiptId,b.lot",
+    "FROM stock_batches b JOIN remaining s ON s.id=b.lot JOIN stock_receipts r ON r.id=b.receipt",
+    "JOIN warehouses w ON w.id=s.warehouse LEFT JOIN products p ON p.id=s.productId WHERE round(b.quantity,9)>0",
+    "UNION ALL SELECT 'stock:'||s.id,s.warehouse,w.name,coalesce(p.name,s.name),p.barcode,s.unit,s.untracked,NULL,NULL,NULL,NULL",
+    "FROM remaining s JOIN warehouses w ON w.id=s.warehouse LEFT JOIN products p ON p.id=s.productId WHERE s.untracked>0"
+  ],
+  "expiryEditWarehouses": [
+    "WITH batch AS (SELECT r.id,r.warehouse_id FROM stock_receipts r JOIN stock_batches b ON b.receipt=r.id",
+    "WHERE r.id=@receipt AND b.lot=@lot AND round(b.quantity,9)>0 AND r.status='posted')",
+    "SELECT warehouse_id AS warehouse FROM batch",
+    "UNION SELECT json_extract(s.lot,'$[0]') FROM stock_batches s JOIN batch b ON b.id=s.receipt WHERE round(s.quantity,9)>0"
+  ],
+  "expiryUpdate": [
+    "UPDATE stock_receipts SET expires_on=@expiresOn WHERE id=@receipt AND expires_on IS @previous"
+  ],
+  "invalidStockBatches": [
+    "SELECT 1 FROM stock_receipts WHERE expires_on IS NOT NULL AND",
+    "(length(expires_on)<>10 OR substr(expires_on,1,4)='0000' OR date(expires_on,'+0 days') IS NOT expires_on",
+    "OR (status='posted' AND NOT EXISTS (SELECT 1 FROM stock_batches b WHERE b.receipt=stock_receipts.id",
+    "AND b.lot=json_array(warehouse_id,product_id,unit,content_unit,quantity_per_piece))))",
+    "UNION ALL SELECT 1 FROM stock_batches b JOIN stock_receipts r ON r.id=b.receipt",
+    "WHERE r.status<>'posted' OR json_type(b.lot) IS NOT 'array' OR json_remove(b.lot,'$[0]')",
+    "IS NOT json_array(r.product_id,r.unit,r.content_unit,r.quantity_per_piece)",
+    "UNION ALL SELECT 1 FROM stock_batches b LEFT JOIN sale_stock s ON s.id=b.lot",
+    "GROUP BY b.lot HAVING round(sum(b.quantity)-coalesce(s.stock,0),9)>0",
+    "UNION ALL SELECT 1 FROM stock_batches b JOIN stock_receipts r ON r.id=b.receipt",
+    "GROUP BY b.receipt HAVING round(sum(b.quantity)-r.quantity,9)>0 LIMIT 1"
+  ]
+}

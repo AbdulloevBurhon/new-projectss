@@ -1,4 +1,5 @@
 if (window.top === window && location.origin === 'https://tsekh4.invalid') {
+  window.workshopReceiptPrinter = true
   let sequence = 0
   const pending = new Map()
 

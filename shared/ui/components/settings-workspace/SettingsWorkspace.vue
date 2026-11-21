@@ -35,8 +35,10 @@ const emit = defineEmits<{
     <Tabs default-value="details" class="mt-6 w-full gap-5">
       <TabsList class="h-11 w-fit flex-wrap justify-start gap-0.5 rounded-xl bg-muted p-1.5">
         <TabsTrigger value="details" class="h-9 flex-none rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm">Детали</TabsTrigger>
+        <slot name="tabs" />
       </TabsList>
-      <TabsContent value="details" class="mt-0">
+      <TabsContent value="details" class="mt-0 space-y-4">
+        <slot name="notice" />
         <section class="grid auto-rows-fr items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3" aria-label="Карточки настроек">
           <PinSettingsCard :product-name="productName" :pin-length="pinLength" @save="pin => emit('changePin', pin)" />
           <ProgramUpdateCard :current-version="currentVersion" :online="online" :update-available="updateAvailable"
@@ -45,6 +47,7 @@ const emit = defineEmits<{
           <slot />
         </section>
       </TabsContent>
+      <slot name="panels" />
     </Tabs>
   </main>
 </template>

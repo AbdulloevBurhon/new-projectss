@@ -19,6 +19,9 @@ export interface Env {
   DB: WorkerDatabase
   UPDATES_BUCKET: WorkerBucket
   ADMIN_API_KEY: string
+  TELEGRAM_BOT_TOKEN?: string
+  TELEGRAM_BOT_USERNAME?: string
+  TELEGRAM_WEBHOOK_SECRET?: string
 }
 
 export interface ApiError { error: string }
@@ -31,6 +34,7 @@ export interface LicenseRow {
   license_from: string
   license_until: string
   cloud_archive_allowed: number
+  telegram_interval_minutes?: number | null
   current_version: string
   updated_at: string
 }

@@ -1,0 +1,10 @@
+{
+  "summaryDaily": [
+    "WITH days AS (SELECT key AS day, value AS start, lead(value) OVER (ORDER BY key) AS end FROM json_each(@boundaries))",
+    "SELECT d.start, count(s.id) AS count, coalesce(sum(s.total),0) AS total, coalesce(sum(s.paid),0) AS paid",
+    "FROM days d LEFT JOIN sales s ON s.date>=d.start AND s.date<d.end",
+    "AND (@allowedWarehouses IS NULL OR s.warehouse IN (SELECT value FROM json_each(@allowedWarehouses)))",
+    "AND (@allowedAccounts IS NULL OR s.account IN (SELECT value FROM json_each(@allowedAccounts)))",
+    "WHERE d.end IS NOT NULL GROUP BY d.day,d.start ORDER BY d.day"
+  ]
+}

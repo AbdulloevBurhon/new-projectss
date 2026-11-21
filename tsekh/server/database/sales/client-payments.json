@@ -1,0 +1,52 @@
+{
+  "clientPaymentSchema": [
+    "CREATE TABLE IF NOT EXISTS client_payments (",
+    "id TEXT PRIMARY KEY NOT NULL, client TEXT NOT NULL REFERENCES clients(id),",
+    "account TEXT NOT NULL REFERENCES accounts(id), date TEXT NOT NULL,",
+    "amount INTEGER NOT NULL CHECK(typeof(amount)='integer' AND amount BETWEEN 1 AND 9007199254740991),",
+    "employee TEXT NOT NULL);",
+    "CREATE INDEX IF NOT EXISTS client_payments_client ON client_payments(client);",
+    "CREATE INDEX IF NOT EXISTS client_payments_account ON client_payments(account);",
+    "CREATE INDEX IF NOT EXISTS sales_client ON sales(client);",
+    "CREATE VIEW IF NOT EXISTS client_totals AS",
+    "SELECT c.id, c.name, c.phone,",
+    "coalesce((SELECT sum(total) FROM sales WHERE client=c.id),0) AS purchases,",
+    "coalesce((SELECT sum(total-paid) FROM sales WHERE client=c.id),0)",
+    "- coalesce((SELECT sum(amount) FROM client_payments WHERE client=c.id),0) AS debt",
+    "FROM clients c;"
+  ],
+  "clientTotals": [
+    "SELECT purchases, debt FROM client_totals WHERE id=@client"
+  ],
+  "clientHistory": [
+    "WITH purchases AS (",
+    "SELECT s.*, sum(total-paid) OVER (ORDER BY date,rowid ROWS UNBOUNDED PRECEDING) AS runningDebt",
+    "FROM sales s WHERE s.client=@client),",
+    "payments AS (SELECT coalesce(sum(amount),0) AS total FROM client_payments WHERE client=@client)",
+    "SELECT * FROM (",
+    "SELECT 'sale:' || s.id AS id, 'sale' AS kind, s.date, s.paid, s.total-s.paid AS debt,",
+    "min(s.total-s.paid,max(0,s.runningDebt-payments.total)) AS remainingDebt, s.seller AS employee,",
+    "NULL AS account, (SELECT json_group_array(json_object('name',name,'qty',qty,'unit',unit))",
+    "FROM (SELECT name,qty,unit FROM sale_lines WHERE sale=s.id ORDER BY rowid)) AS items",
+    "FROM purchases s CROSS JOIN payments",
+    "UNION ALL",
+    "SELECT 'payment:' || p.id, 'payment', p.date, p.amount, -p.amount, 0, p.employee, a.name, '[]'",
+    "FROM client_payments p JOIN accounts a ON a.id=p.account WHERE p.client=@client",
+    ") ORDER BY date DESC,id DESC"
+  ],
+  "existingClientPayment": [
+    "SELECT client, account, amount FROM client_payments WHERE id=@id"
+  ],
+  "postClientPayment": [
+    "INSERT INTO client_payments (id, client, account, date, amount, employee)",
+    "SELECT @id, @client, @account, @date, @amount, @employee",
+    "FROM client_totals WHERE id=@client AND @amount BETWEEN 1 AND debt",
+    "AND EXISTS(SELECT 1 FROM accounts WHERE id=@account)"
+  ],
+  "creditClientPayment": [
+    "UPDATE accounts SET amount=round(amount+@amount/100.0,2),updated_at=CURRENT_TIMESTAMP WHERE id=@account"
+  ],
+  "invalidClientDebt": [
+    "SELECT 1 FROM client_totals WHERE debt<0 LIMIT 1"
+  ]
+}

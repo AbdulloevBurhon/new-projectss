@@ -6,7 +6,7 @@
 
 | Папка | Назначение |
 | --- | --- |
-| [tsekh/](tsekh/) | «Цех», ID направления `tsekh`. Веб-приложение и оболочка Windows x64 |
+| [tsekh/](tsekh/) | «Цех», ID направления `tsekh`. Веб-приложение и оболочка Windows x64. [Карта фич и диагностика](tsekh/STRUCTURE.md) |
 | [shawarma/](shawarma/) | «Шаурмичная», ID направления `shawarma`. Веб-приложение |
 | [production/](production/) | «Простое производство», ID направления `production`. Веб-приложение |
 | [admin/](admin/) | Общая админка. Интерфейс в `app/`, запросы к API в `admin-endpoints/` |

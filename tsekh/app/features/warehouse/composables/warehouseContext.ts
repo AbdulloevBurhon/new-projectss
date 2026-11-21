@@ -6,9 +6,10 @@ import { productsKey } from '../../../../endpoints/warehouse/products/products.s
 import { useProductsStore } from '../../../../endpoints/warehouse/products/products.store'
 import { techCardsKey } from '../../../../endpoints/warehouse/techcards/techcards.service'
 import { useTechCardsStore } from '../../../../endpoints/warehouse/techcards/techcards.store'
-import { accountsKey, getAccounts, type AccountRecord } from '../../../../endpoints/accounts/accounts.service'
+import { accountsKey, type AccountRecord } from '../../../../endpoints/accounts/accounts.service'
 import { loadAccounts as fetchAccounts } from '../../../../endpoints/accounts/get-accounts/store'
 import { useStockReceipts } from './receipts/useStockReceipts'
+import { useEmployeeAccess } from '../../workers/composables/useEmployeeAccess'
 function createContext() {
   const { state, load } = useGetWarehousesStore()
   const products = useProductsStore()
@@ -17,10 +18,15 @@ function createContext() {
   const receiptAccountId = ref('')
   const accounts = useState('accounts', () => [] as AccountRecord[])
   const nuxt = useNuxtApp()
-  const refreshAccounts = () => nuxt.runWithContext(fetchAccounts)
+  const { isOwner } = useEmployeeAccess()
+  const refreshAccounts = async () => {
+    accounts.value = isOwner.value
+      ? await nuxt.runWithContext(fetchAccounts)
+      : await $fetch<AccountRecord[]>('/api/sales/warehouse-accounts')
+  }
   const {
     posted, latest, lines: receiptDrafts, errors: receiptErrors, busy: receiptBusy, loadError: receiptLoadError,
-    seconds: receiptSeconds, edit: updateReceiptDraft, toggle: toggleReceipt, salePriceFor, selectionLocked,
+    seconds: receiptSeconds, edit: updateReceiptDraft, toggle: toggleReceipt, salePriceFor, selectionLocked, changePostedReceipt,
   } = useStockReceipts(receiptWarehouseId, receiptAccountId, () => products.state.rows, refreshAccounts)
   const activeTab = ref('warehouses')
   const warehouseNames = computed(() => {
@@ -33,13 +39,9 @@ function createContext() {
   const listedWarehouses = computed(() => [...warehouseNames.value].map(([id, name]) => ({ id, name })))
   function handleStorage(event: StorageEvent) {
     if (event.key === warehousesKey || event.key === null) load()
-    if (event.key === accountsKey || event.key === null) {
-      try {
-        accounts.value = getAccounts()
-      } catch {
-        toast.error('Не удалось загрузить счета из хранилища.')
-      }
-    }
+    if (event.key === accountsKey || event.key === null) void refreshAccounts().catch(() => {
+      toast.error('Не удалось загрузить счета.')
+    })
     if (event.key === productsKey || event.key === null) products.load()
     if (event.key === techCardsKey || event.key === null) techCards.load()
   }
@@ -48,7 +50,7 @@ function createContext() {
     try {
       await refreshAccounts()
     } catch {
-      toast.error('Не удалось загрузить счета из хранилища.')
+      toast.error('Не удалось загрузить счета.')
     }
     products.load()
     techCards.load()
@@ -58,7 +60,7 @@ function createContext() {
   return {
     activeTab, state, load, products, techCards, accounts, receiptWarehouseId, receiptAccountId,
     posted, latest, receiptDrafts, receiptErrors, receiptBusy, receiptLoadError, receiptSeconds,
-    updateReceiptDraft, toggleReceipt, salePriceFor, selectionLocked, warehouseNames, listedWarehouses,
+    updateReceiptDraft, toggleReceipt, salePriceFor, selectionLocked, changePostedReceipt, warehouseNames, listedWarehouses,
   }
 }
 const key: InjectionKey<ReturnType<typeof createContext>> = Symbol('warehouse')

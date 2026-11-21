@@ -3,9 +3,11 @@ import { getAccounts } from './service'
 import { getAccounts as getLegacyAccounts, saveAccounts } from '../accounts.service'
 
 export async function loadAccounts() {
-  const accounts = tryUseNuxtApp() ? useState<AccountRecord[]>('accounts', () => []) : undefined
+  const nuxt = tryUseNuxtApp()
+  const accounts = nuxt ? useState<AccountRecord[]>('accounts', () => []) : undefined
+  const employee = nuxt ? useCookie<string | null>('tsekh_employee_session') : undefined
   let rows = await getAccounts()
-  if (!rows.length && typeof window !== 'undefined') {
+  if (!employee?.value && !rows.length && typeof window !== 'undefined') {
     let legacy: AccountRecord[]
     try { legacy = getLegacyAccounts() } catch { return rows }
     if (legacy.length) {
@@ -14,7 +16,7 @@ export async function loadAccounts() {
     }
   }
   if (accounts) accounts.value = rows
-  if (rows.length || typeof window !== 'undefined') {
+  if (!employee?.value && (rows.length || typeof window !== 'undefined')) {
     try { saveAccounts(rows) } catch { /* Cache is only for existing offline selectors. */ }
   }
   return rows

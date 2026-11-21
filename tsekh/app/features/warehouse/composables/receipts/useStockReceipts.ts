@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch, type Ref } from 'vue'
-import { discardStockReceipt, loadStockReceipts, startStockReceipt, stockReceiptError, updateStockReceipt } from '../../../../../endpoints/warehouse/stock-receipts/service'
-import type { StockReceipt, StockReceiptAmounts } from '../../../../../endpoints/warehouse/stock-receipts/types'
+import { deletePostedStockReceipt, discardStockReceipt, editPostedStockReceipt, startStockReceipt, stockReceiptError, updateStockReceipt } from '../../../../../endpoints/warehouse/stock-receipts/service'
+import type { PostedStockReceiptEdit, StockReceipt } from '../../../../../endpoints/warehouse/stock-receipts/types'
 import type { Product } from '../../../../../endpoints/warehouse/products/products.types'
 import { useReceiptState,type ReceiptLine } from './useReceiptState'
 import { useReceiptPolling } from './useReceiptPolling'
@@ -62,5 +62,24 @@ const {rows,lines,errors,busy,loadError,saving,posted,latest,fields,salePriceFor
       nextPoll.value = 0
     }
   }
-  return { posted, latest, lines, errors, busy, loadError, seconds, edit, toggle, salePriceFor, selectionLocked }
+  async function changePostedReceipt(row: StockReceipt, amounts?: PostedStockReceiptEdit) {
+    revision.value++
+    try {
+      if (amounts) {
+        const updated = await editPostedStockReceipt(row.id, amounts)
+        revision.value++
+        rows.value = rows.value.map(entry => entry.id === updated.id ? updated : entry)
+      } else {
+        await deletePostedStockReceipt(row.id)
+        revision.value++
+        rows.value = rows.value.filter(entry => entry.id !== row.id)
+      }
+      try { await refreshAccounts() }
+      catch { loadError.value = 'Не удалось обновить остаток счёта.' }
+    } finally {
+      nextPoll.value = 0
+    }
+  }
+
+  return { posted, latest, lines, errors, busy, loadError, seconds, edit, toggle, salePriceFor, selectionLocked, changePostedReceipt }
 }

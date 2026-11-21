@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Archive,Boxes,Inbox,NotebookPen,RefreshCw,Warehouse as WarehouseIcon } from '@lucide/vue'
+import { Archive,Boxes,CalendarDays,Inbox,NotebookPen,RefreshCw,Warehouse as WarehouseIcon } from '@lucide/vue'
 import { computed } from 'vue'
 import { Tabs,TabsList,TabsTrigger } from '@obshaya/ui'
 import { provideWarehouseContext } from '../composables/warehouseContext'
@@ -9,6 +9,7 @@ import HistoryTab from './history/HistoryTab.vue'
 import ProductsTab from './products/ProductsTab.vue'
 import TechCardsTab from './techcards/TechCardsTab.vue'
 import ReceiptsTab from './receipts/ReceiptsTab.vue'
+import ExpiryTab from './expiry/ExpiryTab.vue'
 const { activeTab }=provideWarehouseContext()
 const tabs = [
   { value: 'warehouses', label: 'Склады' },
@@ -17,6 +18,7 @@ const tabs = [
   { value: 'products', label: 'Товары' },
   { value: 'techcards', label: 'Техкарты' },
   { value: 'receipts', label: 'Поступление' },
+  { value: 'expiry', label: 'Срок годности' },
 ]
 const activeTitle = computed(() => tabs.find(tab => tab.value === activeTab.value)?.label ?? 'Склады')
 </script>
@@ -39,6 +41,7 @@ const activeTitle = computed(() => tabs.find(tab => tab.value === activeTab.valu
           <TabsTrigger value="products" class="h-9 flex-none rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><Archive class="size-4 text-blue-600" />Товары</TabsTrigger>
           <TabsTrigger value="techcards" class="h-9 flex-none rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><NotebookPen class="size-4 text-blue-600" />Техкарты</TabsTrigger>
           <TabsTrigger value="receipts" class="h-9 flex-none rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><Inbox class="size-4 text-blue-600" />Поступление</TabsTrigger>
+          <TabsTrigger value="expiry" class="h-9 flex-none rounded-lg px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm"><CalendarDays class="size-4 text-blue-600" />Срок годности</TabsTrigger>
         </TabsList>
       </div>
 
@@ -48,6 +51,7 @@ const activeTitle = computed(() => tabs.find(tab => tab.value === activeTab.valu
       <ProductsTab />
       <TechCardsTab />
       <ReceiptsTab />
+      <ExpiryTab />
     </Tabs>
   </section>
 </template>

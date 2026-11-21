@@ -1,1 +1,6 @@
 ADMIN_API_KEY=replace-with-a-local-only-secret
+
+# Optional Telegram delivery for Tsekh
+TELEGRAM_BOT_USERNAME=""
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_WEBHOOK_SECRET=""

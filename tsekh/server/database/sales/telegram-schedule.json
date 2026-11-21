@@ -1,0 +1,52 @@
+{
+  "telegramScheduleSchema": [
+    "CREATE TABLE IF NOT EXISTS telegram_schedule_local (id INTEGER PRIMARY KEY CHECK(id=1), token TEXT NOT NULL);",
+    "CREATE TABLE IF NOT EXISTS telegram_policy_local (id INTEGER PRIMARY KEY CHECK(id=1), interval_minutes INTEGER NOT NULL, next_at INTEGER NOT NULL);",
+    "CREATE TABLE IF NOT EXISTS telegram_outbox_local (id TEXT PRIMARY KEY, day TEXT NOT NULL, payload TEXT NOT NULL,",
+    "attempted INTEGER NOT NULL DEFAULT 0, retry_at INTEGER NOT NULL DEFAULT 0, UNIQUE(day,attempted));"
+  ],
+  "setTelegramSchedule": [
+    "INSERT INTO telegram_schedule_local VALUES(1,@token) ON CONFLICT(id) DO UPDATE SET token=excluded.token"
+  ],
+  "clearTelegramSchedule": [
+    "DELETE FROM telegram_schedule_local WHERE id=1"
+  ],
+  "getTelegramSchedule": [
+    "SELECT token FROM telegram_schedule_local WHERE id=1"
+  ],
+  "getTelegramPolicy": [
+    "SELECT interval_minutes,next_at FROM telegram_policy_local WHERE id=1"
+  ],
+  "setTelegramPolicy": [
+    "INSERT INTO telegram_policy_local VALUES(1,@minutes,@now) ON CONFLICT(id) DO UPDATE SET",
+    "next_at=CASE WHEN interval_minutes=excluded.interval_minutes THEN next_at ELSE excluded.next_at END,",
+    "interval_minutes=excluded.interval_minutes"
+  ],
+  "advanceTelegramPolicy": [
+    "UPDATE telegram_policy_local SET next_at=@next WHERE id=1"
+  ],
+  "clearTelegramPolicy": [
+    "DELETE FROM telegram_policy_local; DELETE FROM telegram_outbox_local;"
+  ],
+  "clearTelegramOutbox": [
+    "DELETE FROM telegram_outbox_local"
+  ],
+  "pruneTelegramOutbox": [
+    "DELETE FROM telegram_outbox_local WHERE day<@cutoff"
+  ],
+  "queueTelegramJob": [
+    "INSERT INTO telegram_outbox_local(id,day,payload) VALUES(@id,@day,@payload)",
+    "ON CONFLICT(day,attempted) DO UPDATE SET id=excluded.id,payload=excluded.payload"
+  ],
+  "findTelegramJob": [
+    "SELECT j.id,j.payload FROM telegram_outbox_local j WHERE j.retry_at<=@now",
+    "AND (j.attempted=1 OR NOT EXISTS (SELECT 1 FROM telegram_outbox_local p WHERE p.day=j.day AND p.attempted=1))",
+    "ORDER BY j.day,j.attempted DESC LIMIT 1"
+  ],
+  "markTelegramJob": [
+    "UPDATE telegram_outbox_local SET attempted=1,retry_at=@retry WHERE id=@id"
+  ],
+  "removeTelegramJob": [
+    "DELETE FROM telegram_outbox_local WHERE id=@id"
+  ]
+}

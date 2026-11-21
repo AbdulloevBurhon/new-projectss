@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEmployeeAccess } from '../../../workers/composables/useEmployeeAccess'
 import { computed, ref } from 'vue'
 import { Button,DataTable,Input,Tabs,TabsList,TabsTrigger,TabsContent,toast } from '@obshaya/ui'
 import { Archive,Plus,Pencil,Trash2 } from '@lucide/vue'
@@ -42,6 +43,7 @@ async function saveProduct(draft: ProductDraft) {
 }
 
 async function saveMassProduct(draft: ProductDraft, id?: string) {
+  if (id && !can('warehouses.edit')) return null
   if (!await products.save(draft, id)) return null
   const saved = products.state.rows.find(product => product.id === id) ?? products.state.rows[0]
   if (saved) toast.success(id ? 'Товар изменён.' : 'Товар добавлен.')
@@ -53,6 +55,8 @@ async function confirmDeleteProduct() {
   productDeleteOpen.value = false
   toast.success('Товар удалён.')
 }
+
+const { can } = useEmployeeAccess()
 </script>
 
 <template>
@@ -69,7 +73,7 @@ async function confirmDeleteProduct() {
       <p v-if="products.state.loading" class="text-sm text-muted-foreground" role="status">Загрузка товаров…</p>
       <p v-else-if="products.state.error && productView === 'list'" class="text-sm text-destructive" role="alert">{{ products.state.error }}</p>
       <TabsContent value="mass" force-mount class="data-[state=inactive]:hidden">
-        <ProductBulkEntry v-show="!products.state.loading" :save="saveMassProduct" :error="products.state.error" />
+        <ProductBulkEntry v-show="!products.state.loading" :save="saveMassProduct" :can-edit="can('warehouses.edit')" :error="products.state.error" />
       </TabsContent>
       <TabsContent value="list">
         <DataTable v-if="!products.state.loading && !products.state.error" :columns="productColumns" :rows="visibleProducts" :empty-text="productSearch.trim() ? 'Совпадений не найдено' : 'Товаров пока нет'">
@@ -79,8 +83,8 @@ async function confirmDeleteProduct() {
           </template>
           <template #cell-actions="{ row }">
             <div class="flex justify-end gap-1">
-              <Button size="icon" variant="ghost" :aria-label="`Изменить товар ${row.name}`" @click="openProductForm(row)"><Pencil class="size-4 text-blue-600" /></Button>
-              <Button size="icon" variant="ghost" :aria-label="`Удалить товар ${row.name}`" @click="openProductDelete(row)"><Trash2 class="size-4 text-destructive" /></Button>
+              <Button v-if="can('warehouses.edit')" size="icon" variant="ghost" :aria-label="`Изменить товар ${row.name}`" @click="openProductForm(row)"><Pencil class="size-4 text-blue-600" /></Button>
+              <Button v-if="can('warehouses.delete')" size="icon" variant="ghost" :aria-label="`Удалить товар ${row.name}`" @click="openProductDelete(row)"><Trash2 class="size-4 text-destructive" /></Button>
             </div>
           </template>
         </DataTable>

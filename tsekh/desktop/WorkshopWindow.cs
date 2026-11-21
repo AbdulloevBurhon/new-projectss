@@ -1,7 +1,10 @@
 using System;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -10,13 +13,15 @@ internal sealed class WorkshopWindow : Form
 {
     private readonly string root;
     private readonly bool hidden;
+    private readonly Action<Uri> openInBrowser;
     private readonly WebView2 webView = new WebView2 { Dock = DockStyle.Fill };
     internal int ExitCode { get; private set; }
 
-    internal WorkshopWindow(string root, bool hidden)
+    internal WorkshopWindow(string root, bool hidden, Action<Uri> openInBrowser = null)
     {
         this.root = root;
         this.hidden = hidden;
+        this.openInBrowser = openInBrowser ?? OpenInSystemBrowser;
         Text = "Цех-4";
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1440, 900);
@@ -60,7 +65,17 @@ internal sealed class WorkshopWindow : Form
                 else assets.Serve(s, e);
             };
             core.NavigationStarting += (s, e) => { if (!WorkshopAssets.IsAppUrl(e.Uri)) e.Cancel = true; };
-            core.NewWindowRequested += (s, e) => { e.Handled = true; };
+            core.NewWindowRequested += OpenRequestedWindow;
+            var lastRendererReload = DateTime.MinValue;
+            core.ProcessFailed += (s, e) =>
+            {
+                if (e.ProcessFailedKind != CoreWebView2ProcessFailedKind.RenderProcessExited) return;
+                var now = DateTime.UtcNow;
+                if (now - lastRendererReload < TimeSpan.FromSeconds(30)) return;
+                lastRendererReload = now;
+                try { core.Reload(); }
+                catch (InvalidOperationException) { }
+            };
             core.PermissionRequested += (s, e) => { e.State = CoreWebView2PermissionState.Deny; };
             core.WebMessageReceived += backups.Receive;
             using (Stream source = Assembly.GetExecutingAssembly().GetManifestResourceStream("bridge.js"))
@@ -74,5 +89,26 @@ internal sealed class WorkshopWindow : Form
             else MessageBox.Show(this, "Не удалось запустить «Цех-4».\n" + error.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             Close();
         }
+    }
+
+    private void OpenRequestedWindow(object sender, CoreWebView2NewWindowRequestedEventArgs args)
+    {
+        args.Handled = true;
+        Uri uri;
+        if (!args.IsUserInitiated || !WorkshopAssets.IsAppUrl(((CoreWebView2)sender).Source)
+            || !Uri.TryCreate(args.Uri, UriKind.Absolute, out uri) || uri.Scheme != Uri.UriSchemeHttps
+            || uri.Host != "t.me" || !uri.IsDefaultPort || uri.UserInfo.Length != 0 || uri.Fragment.Length != 0
+            || !Regex.IsMatch(uri.PathAndQuery, @"\A/[A-Za-z0-9_]{5,32}\?start=[a-f0-9]{32}\z")) return;
+
+        try { openInBrowser(uri); }
+        catch (Win32Exception)
+        {
+            MessageBox.Show(this, "Не удалось открыть ссылку в браузере по умолчанию.", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private static void OpenInSystemBrowser(Uri uri)
+    {
+        using (Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true })) { }
     }
 }

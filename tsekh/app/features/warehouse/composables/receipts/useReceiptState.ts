@@ -6,6 +6,7 @@ export interface ReceiptLine {
   quantity: string
   unitPrice: string
   salePrice: string
+  expiresOn: string
 }
 export function useReceiptState(warehouseId:Ref<string>,accountId:Ref<string>,products:()=>Product[]) {
   const rows = ref<StockReceipt[]>([])
@@ -46,6 +47,7 @@ export function useReceiptState(warehouseId:Ref<string>,accountId:Ref<string>,pr
       quantity: row.quantity === null ? '' : String(row.quantity),
       unitPrice: row.unitPrice === null ? '' : String(row.unitPrice),
       salePrice: row.salePrice == null ? '' : String(row.salePrice),
+      expiresOn: row.expiresOn ?? '',
     }
   }
 
@@ -55,7 +57,7 @@ export function useReceiptState(warehouseId:Ref<string>,accountId:Ref<string>,pr
 
   function newLine(id: string): ReceiptLine {
     const product = products().find(row => row.id === id)
-    return { quantity: '', unitPrice: '', salePrice: product ? salePriceFor(product) : '' }
+    return { quantity: '', unitPrice: '', salePrice: product ? salePriceFor(product) : '', expiresOn: '' }
   }
 
   function payload(id: string): StockReceiptAmounts {
@@ -64,6 +66,7 @@ export function useReceiptState(warehouseId:Ref<string>,accountId:Ref<string>,pr
       quantity: line.quantity.trim() ? Number(line.quantity) : null,
       unitPrice: line.unitPrice.trim() ? Number(line.unitPrice) : null,
       salePrice: line.salePrice.trim() ? Number(line.salePrice) : null,
+      expiresOn: line.expiresOn || null,
     }
   }
 

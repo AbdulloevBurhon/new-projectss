@@ -19,6 +19,7 @@ export interface AdminClient {
   licenseFrom: string
   licenseUntil: string
   cloudArchiveAllowed: boolean | number
+  telegramIntervalMinutes?: number
   currentVersion: string
   unreadMessages: number
 }

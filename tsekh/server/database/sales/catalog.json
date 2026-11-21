@@ -1,0 +1,36 @@
+{
+  "catalog": [
+    "SELECT s.*,p.barcode FROM sale_stock s LEFT JOIN products p ON p.id=s.productId",
+    "WHERE s.stock>0 ORDER BY s.name"
+  ],
+  "catalogPage": [
+    "SELECT s.*,p.barcode FROM sale_stock s LEFT JOIN products p ON p.id=s.productId",
+    "WHERE s.warehouse=@warehouse AND s.stock>0 AND (@afterId='' OR (s.name,s.id)>(@afterName,@afterId))",
+    "ORDER BY s.name,s.id LIMIT @limit"
+  ],
+  "catalogBarcode": [
+    "SELECT s.*,p.barcode FROM products p JOIN sale_stock s ON s.productId=p.id",
+    "WHERE p.barcode=@code COLLATE NOCASE AND s.warehouse=@warehouse AND s.stock>0 LIMIT 2"
+  ],
+  "clients": [
+    "SELECT id,name,phone,debt/100.0 AS debt FROM client_totals ORDER BY name"
+  ],
+  "createClient": [
+    "INSERT INTO clients VALUES(@id,trim(@name),trim(@phone))"
+  ],
+  "editClient": [
+    "UPDATE clients SET name=trim(@name),phone=trim(@phone) WHERE id=@id"
+  ],
+  "deleteClient": [
+    "DELETE FROM clients WHERE id=@id"
+  ],
+  "warehouseAccounts": [
+    "SELECT id,name,amount FROM accounts ORDER BY name,id"
+  ],
+  "warehouses": [
+    "SELECT id,name FROM warehouses ORDER BY name,id"
+  ],
+  "accounts": [
+    "SELECT id,name FROM accounts ORDER BY name,id"
+  ]
+}

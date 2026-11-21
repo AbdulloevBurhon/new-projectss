@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useEmployeeAccess } from '../../../workers/composables/useEmployeeAccess'
 import { computed, ref } from 'vue'
 import { Button,DataTable,Input,TabsContent,toast } from '@obshaya/ui'
 import { Plus,Pencil,Trash2 } from '@lucide/vue'
@@ -14,6 +15,7 @@ const create = useCreateWarehouseStore()
 const update = useUpdateWarehouseStore()
 const remove = useDeleteWarehouseStore()
 const dialogOpen = ref(false)
+const saving = ref(false)
 const editing = ref<Warehouse | null>(null)
 const deleting = ref<Warehouse | null>(null)
 const deleteOpen = ref(false)
@@ -43,14 +45,20 @@ function openDelete(warehouse: Warehouse) {
   deleteOpen.value = true
 }
 async function save(draft: WarehouseDraft) {
+  if (saving.value || !dialogOpen.value) return
+  saving.value = true
   const warehouse = editing.value
-  const saved = warehouse
-    ? await update.execute({ id: warehouse.id, ...draft })
-    : await create.execute(draft)
-  if (!saved) return
-  load()
-  dialogOpen.value = false
-  toast.success(warehouse ? 'Склад обновлён.' : 'Склад добавлен.')
+  try {
+    const saved = warehouse
+      ? await update.execute({ id: warehouse.id, ...draft })
+      : await create.execute(draft)
+    if (!saved) return
+    await load()
+    dialogOpen.value = false
+    toast.success(warehouse ? 'Склад обновлён.' : 'Склад добавлен.')
+  } finally {
+    saving.value = false
+  }
 }
 
 async function confirmDelete() {
@@ -59,13 +67,15 @@ async function confirmDelete() {
   deleteOpen.value = false
   toast.success('Склад удалён.')
 }
+
+const { can, profile } = useEmployeeAccess()
 </script>
 
 <template>
   <TabsContent value="warehouses" class="space-y-4">
     <div class="flex flex-wrap items-center gap-3">
       <Input v-model="warehouseSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск склада" />
-      <Button class="ml-auto" :disabled="state.loading || !!state.error" @click="openForm()">
+      <Button v-if="profile?.resources?.warehouses == null" class="ml-auto" :disabled="state.loading || !!state.error" @click="openForm()">
         <Plus class="size-4" />
         Склад
       </Button>
@@ -76,15 +86,15 @@ async function confirmDelete() {
       <template #cell-number="{ index }">{{ index + 1 }}</template>
       <template #cell-type="{ row }">{{ typeLabel(row.type) }}</template>
       <template #cell-actions="{ row }">
-        <Button size="icon" variant="ghost" :aria-label="`Редактировать склад «${row.name}»`" @click="openForm(row)">
+        <Button v-if="can('warehouses.edit')" size="icon" variant="ghost" :aria-label="`Редактировать склад «${row.name}»`" @click="openForm(row)">
           <Pencil class="size-4 text-blue-600" />
         </Button>
-        <Button size="icon" variant="ghost" :aria-label="`Удалить склад «${row.name}»`" @click="openDelete(row)">
+        <Button v-if="can('warehouses.delete')" size="icon" variant="ghost" :aria-label="`Удалить склад «${row.name}»`" @click="openDelete(row)">
           <Trash2 class="size-4 text-destructive" />
         </Button>
       </template>
     </DataTable>
   </TabsContent>
-    <WarehouseFormDialog v-model:open="dialogOpen" :warehouse="editing" :saving="formStore.pending.value" :error="formStore.error.value" @save="save" />
+    <WarehouseFormDialog v-model:open="dialogOpen" :warehouse="editing" :saving="saving" :error="formStore.error.value" @save="save" />
     <DeleteWarehouseDialog v-model:open="deleteOpen" :name="deleting?.name || ''" :pending="remove.pending.value" :error="remove.error.value" @confirm="confirmDelete" />
 </template>

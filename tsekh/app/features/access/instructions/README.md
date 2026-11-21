@@ -1,6 +1,9 @@
-# Access feature
+# Активация, вход и поддержка
 
-- `components/PinEntry.vue` owns PIN entry and the support-message dialog.
-- `composables/usePinAccess.ts` validates the temporary local demo PIN and manages the session cookie.
-- The temporary PIN is `12345`; replace demo validation with the license/auth API before distribution.
-- Support submission remains local until the Worker endpoint is implemented.
+[Главная карта](../../../../STRUCTURE.md)
+
+- `/activation` открывает `ActivationEntry.vue`, `/pin` — `PinEntry.vue`. Переходы определяет [`access.global.ts`](../../../middleware/access.global.ts). Активацию и лицензию ищи в `endpoints/access/license/`.
+- [`usePinAccess.ts`](../composables/usePinAccess.ts) проверяет ПИН через облачный API. Постоянный ПИН можно проверить офлайн через локальный отпечаток при действующем сохранённом доступе. Временный ПИН ведёт к смене кода в настройках.
+- Запросы поддержки идут через `endpoints/support/messages/` и общие компоненты `shared/ui/components/client-messages/`. Облачный клиент и заголовки установки определены в [`client-api.ts`](../../../../../shared/contracts/client-api.ts). Лицензии и сообщения обслуживает [Cloudflare Worker](../../../../../cloudflare/worker/README.md).
+- Для `401` у `messages?peek=1` проверь идентификатор установки, наличие ПИН в запросе и срок облачного доступа. Для сетевого сбоя проверь результат после восстановления сети. ПИН в диагностический отчёт не включай.
+- При изменении проверь новую активацию, действующий и просроченный ПИН, вход офлайн и сообщения после возвращения сети. Общий экран принимает ПИН администратора или сотрудника. Если облачный API отклоняет код администратора или сеть недоступна и офлайн-проверка не подошла, приложение пробует локальный вход сотрудника при действующей лицензии. После входа администратора локальный API сохраняет хеш постоянного ПИН для проверки уникальности. При входе с временным кодом открываются «Настройки» с подсказкой. После сохранения постоянного кода рабочие разделы открываются в том же сеансе.

@@ -1,0 +1,42 @@
+{
+  "stock": [
+    "SELECT * FROM sale_stock ORDER BY name"
+  ],
+  "move": [
+    "INSERT INTO stock_movements(id,lot,source,target,qty,name,price,created)",
+    "SELECT @id,id,warehouse,@target,@qty,name,price/factor,CAST(strftime('%s','now') AS INTEGER)*1000",
+    "FROM sale_stock",
+    "WHERE id=@lot AND typeof(@qty) IN ('integer','real') AND abs(@qty) BETWEEN 0.000001 AND 1000000",
+    "AND (@target IS NULL AND stock+@qty>=0 OR @target IS NOT NULL AND @target!=warehouse AND @qty>0",
+    "AND stock>=@qty)",
+    "AND (unit NOT IN ('шт','уп') OR abs(@qty*factor-round(@qty*factor))<0.0000001 OR contentUnit",
+    "NOT IN ('шт','уп') AND contentUnit IS NOT NULL)"
+  ],
+  "history": [
+    "SELECT 'sale:'||l.rowid id,'Продажа' operation,CAST(strftime('%s',s.date) AS INTEGER)*1000 postedAt,s.warehouse",
+    "warehouseId,s.warehouseName,l.name productName,-l.qty quantity,l.unit,l.amount/100.0 total,",
+    "s.accountName AS accountName,s.seller AS employee,s.account AS accountId,",
+    "CASE WHEN json_valid(l.lot) THEN json_extract(l.lot,'$[1]') END AS productId FROM",
+    "sale_lines l JOIN sales s ON s.id=l.sale",
+    "UNION ALL SELECT m.id,CASE WHEN r.id IS NOT NULL THEN 'Ревизия' WHEN target IS NULL THEN 'Корректировка' ELSE 'Перемещение · расход'",
+    "END,m.created,source,w.name,m.name,CASE WHEN r.id IS NOT NULL THEN round(qty*coalesce(json_extract(lot,'$[4]'),1),6)",
+    "WHEN target IS NULL THEN qty ELSE -qty END,CASE WHEN r.id IS NOT NULL THEN coalesce(json_extract(lot,'$[3]'),",
+    "json_extract(lot,'$[2]')) ELSE json_extract(lot,'$[2]') END,NULL,NULL,r.actor,NULL,",
+    "CASE WHEN json_valid(m.lot) THEN json_extract(m.lot,'$[1]') END",
+    "FROM stock_movements m JOIN warehouses w ON w.id=m.source LEFT JOIN stock_revisions r",
+    "ON substr(m.id,1,9)='revision:' AND r.id=substr(m.id,10,36)",
+    "UNION ALL SELECT m.id||':in','Перемещение · приход',created,target,w.name,m.name,qty,json_extract(lot,'$[2]'),NULL,NULL,NULL,NULL,",
+    "CASE WHEN json_valid(m.lot) THEN json_extract(m.lot,'$[1]') END",
+    "FROM stock_movements m JOIN warehouses w ON w.id=m.target"
+  ],
+  "canReduceReceiptStock": [
+    "SELECT 1 FROM sale_stock s JOIN stock_receipts r ON r.id=@id",
+    "AND s.id=json_array(r.warehouse_id,r.product_id,r.unit,r.content_unit,r.quantity_per_piece)",
+    "WHERE round(coalesce((SELECT b.quantity FROM stock_batches b WHERE b.lot=s.id AND b.receipt=r.id),",
+    "s.stock-coalesce((SELECT sum(b.quantity) FROM stock_batches b WHERE b.lot=s.id),0))-@reduction,9)>=0"
+  ],
+  "adjustReceiptAccount": [
+    "UPDATE accounts SET amount=ROUND(amount-@delta,2),updated_at=CURRENT_TIMESTAMP WHERE id=@accountId",
+    "AND (@delta<=0 OR ROUND(amount,2)>=@delta)"
+  ]
+}

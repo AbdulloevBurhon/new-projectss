@@ -1,0 +1,36 @@
+{
+  "report": [
+    "SELECT * FROM sales ORDER BY date DESC,rowid DESC"
+  ],
+  "detail": [
+    "SELECT * FROM sale_lines WHERE sale=@id ORDER BY rowid"
+  ],
+  "receiptHeader": [
+    "SELECT * FROM sales WHERE id=@id"
+  ],
+  "ownReceipt": [
+    "SELECT 1 FROM sale_workers WHERE sale=@id AND worker=@worker"
+  ],
+  "telegramStock": [
+    "SELECT coalesce(w.name,s.warehouse) AS warehouseName, s.warehouse, s.productId, s.name, s.unit, s.stock, s.contentUnit,",
+    "s.factor FROM sale_stock s LEFT JOIN warehouses w ON w.id=s.warehouse ORDER BY warehouseName,s.warehouse,s.name,s.id"
+  ],
+  "telegramSales": [
+    "SELECT count(*) AS count,coalesce(sum(total),0) AS total,coalesce(sum(paid),0) AS paid,",
+    "coalesce((SELECT sum(amount) FROM client_payments),0) AS repayments FROM sales"
+  ],
+  "telegramDaySales": [
+    "SELECT count(*) AS count,coalesce(sum(total),0) AS total,coalesce(sum(paid),0) AS paid,",
+    "coalesce((SELECT sum(amount) FROM client_payments),0) AS repayments FROM sales",
+    "WHERE date>=@from AND date<@to"
+  ],
+  "workerSales": [
+    "SELECT s.id,s.date,s.total,s.total-s.paid AS debt,s.clientName,",
+    "  (SELECT json_group_array(json_object('name',l.name,'qty',l.qty,'unit',l.unit)) FROM sale_lines",
+    "l WHERE l.sale=s.id) AS lines",
+    "  FROM sale_workers w JOIN sales s ON s.id=w.sale WHERE w.worker=@id",
+    "  AND (@from='' OR s.date>=@from) AND (@to='' OR s.date<@to)",
+    "  AND (@allowedWarehouses IS NULL OR s.warehouse IN (SELECT value FROM json_each(@allowedWarehouses)))",
+    "  AND (@allowedAccounts IS NULL OR s.account IN (SELECT value FROM json_each(@allowedAccounts))) ORDER BY s.date DESC,s.rowid DESC"
+  ]
+}

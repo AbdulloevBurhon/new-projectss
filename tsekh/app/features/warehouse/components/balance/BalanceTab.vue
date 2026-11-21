@@ -3,9 +3,11 @@ import { computed, ref, watch } from 'vue'
 import { Button,DataTable,Input,TabsContent } from '@obshaya/ui'
 import { ArrowLeftRight,SlidersHorizontal } from '@lucide/vue'
 import StockMovementDialog from './StockMovementDialog.vue'
+import { useEmployeeAccess } from '../../../workers/composables/useEmployeeAccess'
 import { type Goods } from '../../../../../endpoints/sales/service'
 import { numberFormat } from '../../format'
 import { useWarehouseContext } from '../../composables/warehouseContext'
+const { can } = useEmployeeAccess()
 const { activeTab,posted,listedWarehouses,warehouseNames,receiptLoadError } = useWarehouseContext()
 const balanceWarehouseId = ref('')
 const balanceSearch = ref('')
@@ -42,7 +44,7 @@ const balanceColumns = [
     <div class="flex flex-wrap items-center gap-3">
       <select v-model="balanceWarehouseId" aria-label="Склад" class="h-10 min-w-48 rounded-md border bg-background px-3 text-sm"><option value="">Все склады</option><option v-for="warehouse in listedWarehouses" :key="warehouse.id" :value="warehouse.id">{{ warehouse.name }}</option></select>
       <Input v-model="balanceSearch" class="max-w-xs" type="search" placeholder="Поиск по названию" aria-label="Поиск товара" />
-      <div class="ml-auto flex flex-wrap gap-2">
+      <div v-if="can('warehouses.edit')" class="ml-auto flex flex-wrap gap-2">
         <Button type="button" variant="outline" @click="movement='transfer'"><ArrowLeftRight class="size-4" />Перемещение</Button>
         <Button type="button" variant="outline" @click="movement='adjust'"><SlidersHorizontal class="size-4" />Корректировка</Button>
       </div>

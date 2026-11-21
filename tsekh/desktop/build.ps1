@@ -56,7 +56,8 @@ try {
     New-Item -ItemType Directory -Path $release -Force | Out-Null
     $artifact = Join-Path $release "Tsekh-$appVersion-Windows-x64.exe"
     $framework = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319'
-    $sources = Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' | Select-Object -ExpandProperty FullName
+    $sources = Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.cs' -File | Select-Object -ExpandProperty FullName
+    $sources += Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'modules') -Filter '*.cs' -File -Recurse | Select-Object -ExpandProperty FullName
     $versionSource = Join-Path $stage 'Version.cs'
     @"
 using System.Reflection;
@@ -65,13 +66,14 @@ using System.Reflection;
 internal static class DesktopConfig { internal const string ApiBase = "$apiBase"; }
 "@ | Set-Content -LiteralPath $versionSource -Encoding UTF8
     $sources += $versionSource
-    $salesSql = Join-Path $PSScriptRoot '../server/database/sales/queries.json'
+    $salesResources = Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot '../server/database/sales') -Filter '*.json' -File |
+        ForEach-Object { '/resource:{0},sales.{1}' -f $_.FullName, $_.Name }
     $bridge = Join-Path $PSScriptRoot 'bridge.js'
     & (Join-Path $framework 'csc.exe') /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 `
-        /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll /reference:System.Data.dll /reference:System.IO.Compression.dll `
+        /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.dll /reference:System.Web.Extensions.dll /reference:System.Data.dll /reference:System.IO.Compression.dll `
         "/reference:$core" "/reference:$forms" "/reference:$sqliteAssembly" "/resource:$core,Microsoft.Web.WebView2.Core.dll" "/resource:$forms,Microsoft.Web.WebView2.WinForms.dll" `
         "/resource:$sqliteAssembly,System.Data.SQLite.dll" "/resource:$sqliteNative,SQLite.Interop.dll" "/resource:$loader,WebView2Loader.dll" `
-        "/resource:$salesSql,sales.json" "/resource:$archive,renderer.zip" "/resource:$bridge,bridge.js" "/resource:$license,WebView2-License.txt" "/out:$artifact" @sources
+        @salesResources "/resource:$archive,renderer.zip" "/resource:$bridge,bridge.js" "/resource:$license,WebView2-License.txt" "/out:$artifact" @sources
     if ($LASTEXITCODE -ne 0) { throw 'Windows application compilation failed.' }
     Get-Item -LiteralPath $artifact | Select-Object FullName, Length
 } finally {

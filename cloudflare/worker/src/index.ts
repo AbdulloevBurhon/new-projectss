@@ -11,6 +11,7 @@ import { changePin, verifyPin } from './handlers/client/access'
 import { handleActivationSupport, handleClientMessages, handleClientSupport } from './handlers/client/messages'
 import { handleActivationMessages } from './handlers/admin/activation-messages'
 import { listClientUpdates } from './handlers/client/updates'
+import { telegramClient, telegramWebhook } from './handlers/client/telegram'
 import { requireAdmin } from './middleware/admin-auth'
 import { apiError, corsHeaders, json, notFound } from './utils/http'
 
@@ -20,6 +21,8 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: { ...corsHeaders, 'Access-Control-Max-Age': '86400' } })
     const parts = new URL(request.url).pathname.split('/').filter(Boolean)
     if (parts[0] === 'health') return json({ status: 'ok', service: 'obshaya-programma-api' })
+
+    if (parts.join('/') === 'api/telegram/webhook' && request.method === 'POST') return await telegramWebhook(request, env)
 
     if (parts[0] === 'api' && parts[1] === 'admin') {
       const unauthorized = requireAdmin(request, env)
@@ -39,6 +42,7 @@ export default {
     }
 
     if (parts[0] === 'api' && parts[1] === 'client') {
+      if (parts[2] === 'telegram' && !parts[4]) return await telegramClient(request, env, parts[3])
       if (parts[2] === 'activation') return handleActivation(request, env, parts[3])
       if (parts[2] === 'pin' && parts[3] === 'verify' && request.method === 'POST') return verifyPin(request, env)
       if (parts[2] === 'pin' && parts[3] === 'change' && request.method === 'POST') return changePin(request, env)

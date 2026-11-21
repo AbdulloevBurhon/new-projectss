@@ -6,6 +6,7 @@ import { clients } from '../../admin-state'
 import type { ClientItem } from '../../admin-state'
 import { editClient, issueLoginPin, issueTemporaryPin, listClientVersionHistory, listClients, removeClient as removeClientApi } from '../../../../admin-endpoints/clients/clients.service'
 import { deleteMessage as deleteMessageApi, listMessages, replyToClient } from '../../../../admin-endpoints/messages/messages.service'
+import ClientEditDialog from './ClientEditDialog.vue'
 
 const query = ref('')
 const selected = ref<ClientItem | null>(null)
@@ -15,8 +16,6 @@ const deleteOpen = ref(false)
 const statusOpen = ref(false)
 const pinOpen = ref(false)
 const messagesOpen = ref(false)
-const editName = ref('')
-const editUntil = ref('')
 const pinCode = ref('')
 const pinExpiresAt = ref(0)
 const currentTime = ref(Date.now())
@@ -43,7 +42,7 @@ async function refreshClients() {
   try { clients.value = await listClients() } catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось загрузить клиентов') }
 }
 
-function openEdit(row: ClientItem) { selected.value = row; editName.value = row.client; editUntil.value = row.licenseUntil; editOpen.value = true }
+function openEdit(row: ClientItem) { selected.value = row; editOpen.value = true }
 function openStatus(row: ClientItem) { selected.value = row; statusOpen.value = true }
 async function openInfo(row: ClientItem) {
   selected.value = row; infoOpen.value = true
@@ -101,11 +100,6 @@ async function deleteMessage() {
   catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось удалить сообщение') }
   finally { messageDeleteOpen.value = false }
 }
-async function saveEdit() {
-  if (!selected.value || !editName.value.trim() || !editUntil.value) return toast.error('Заполните имя и срок лицензии')
-  try { await editClient(selected.value.id, { clientName: editName.value.trim(), licenseUntil: new Date(editUntil.value).toISOString() }); editOpen.value = false; await refreshClients(); toast.success('Данные клиента обновлены') }
-  catch (error) { toast.error(error instanceof Error ? error.message : 'Не удалось сохранить клиента') }
-}
 function formatDate(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split('-').reverse().join('.') : value }
 async function removeClient() {
   if (!selected.value) return
@@ -131,7 +125,7 @@ async function removeClient() {
         <DropdownMenuTrigger as-child><Button size="icon" variant="ghost" aria-label="Действия клиента"><Ellipsis class="size-4" /></Button></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem @click="openInfo(row)"><Info class="mr-2 size-4 text-sky-600" />Подробнее</DropdownMenuItem>
-          <DropdownMenuItem @click="openEdit(row)"><Pencil class="mr-2 size-4 text-amber-600" />Изменить имя и срок</DropdownMenuItem>
+          <DropdownMenuItem @click="openEdit(row)"><Pencil class="mr-2 size-4 text-amber-600" />Редактировать клиента</DropdownMenuItem>
           <DropdownMenuItem @click="openStatus(row)"><Power class="mr-2 size-4 text-emerald-600" />{{ row.active ? 'Отключить' : 'Включить' }}</DropdownMenuItem>
           <DropdownMenuItem :disabled="archiveBusyId === row.id" @click="toggleCloudArchive(row)"><Archive class="mr-2 size-4 text-emerald-600" />Архив <ToggleRight v-if="row.cloudArchiveAllowed" class="ml-auto size-5 text-emerald-600" /><ToggleLeft v-else class="ml-auto size-5 text-slate-400" /></DropdownMenuItem>
           <DropdownMenuItem @click="openPin(row)"><KeyRound class="mr-2 size-4 text-violet-600" />Изменить PIN-код</DropdownMenuItem>
@@ -141,10 +135,7 @@ async function removeClient() {
         </DropdownMenuContent>
       </DropdownMenu></div></template>
     </DataTable>
-    <Dialog v-model:open="editOpen"><DialogContent><DialogHeader><DialogTitle>Редактировать клиента</DialogTitle><DialogDescription>Измените имя и дату окончания лицензии.</DialogDescription></DialogHeader>
-      <div class="space-y-4 py-2"><div class="space-y-2"><Label for="client-edit-name">Имя клиента</Label><Input id="client-edit-name" v-model="editName" /></div><div class="space-y-2"><Label for="client-edit-until">Лицензия до</Label><Input id="client-edit-until" v-model="editUntil" type="date" /></div></div>
-      <DialogFooter><Button variant="outline" @click="editOpen = false">Отмена</Button><Button @click="saveEdit">Сохранить</Button></DialogFooter>
-    </DialogContent></Dialog>
+    <ClientEditDialog v-model:open="editOpen" :client="selected" @saved="refreshClients" />
     <Dialog v-model:open="infoOpen"><DialogContent><DialogHeader><DialogTitle>{{ selected?.client }}</DialogTitle><DialogDescription>История переходов между версиями.</DialogDescription></DialogHeader>
       <div class="space-y-2"><h3 class="text-sm font-medium">История обновлений</h3><DataTable :columns="historyColumns" :rows="selected?.versionHistory ?? []" row-key="date" empty-text="Истории обновлений пока нет"><template #cell-date="{ value }"><span class="whitespace-nowrap">{{ value }}</span></template><template #cell-to="{ value }"><span class="font-medium">{{ value }}</span></template></DataTable></div>
       <DialogFooter><Button variant="outline" @click="infoOpen = false">Закрыть</Button></DialogFooter>
